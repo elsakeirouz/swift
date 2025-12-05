@@ -5532,6 +5532,23 @@ public:
   }
 };
 
+class DesugarForEachStmtRequest
+    : public SimpleRequest<DesugarForEachStmtRequest,
+                           Stmt *(const ForEachStmt*),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Stmt *evaluate(Evaluator &evaluator, const ForEachStmt *FES) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"

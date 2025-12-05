@@ -1003,6 +1003,7 @@ class ForEachStmt : public LabeledStmt {
   SourceLoc WhereLoc;
   Expr *WhereExpr = nullptr;
   BraceStmt *Body;
+  DeclContext* DC = nullptr;
 
   // Set by Sema:
   ProtocolConformanceRef sequenceConformance = ProtocolConformanceRef();
@@ -1017,7 +1018,7 @@ public:
               SourceLoc AwaitLoc, SourceLoc UnsafeLoc, Pattern *Pat,
               SourceLoc InLoc, Expr *Sequence,
               SourceLoc WhereLoc, Expr *WhereExpr, BraceStmt *Body,
-              std::optional<bool> implicit = std::nullopt)
+              DeclContext* DC, std::optional<bool> implicit = std::nullopt)
       : LabeledStmt(StmtKind::ForEach, getDefaultImplicitFlag(implicit, ForLoc),
                     LabelInfo),
         ForLoc(ForLoc), TryLoc(TryLoc), AwaitLoc(AwaitLoc), UnsafeLoc(UnsafeLoc),
@@ -1086,10 +1087,15 @@ public:
   
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(ForLoc); }
   SourceLoc getEndLoc() const { return Body->getEndLoc(); }
+
+  DeclContext *getDeclContext() const { return DC; }
+  void setDeclContext(DeclContext *newDC) { DC = newDC; }
   
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::ForEach;
   }
+
+  Stmt* desugar() const;
 };
 
 /// A pattern and an optional guard expression used in a 'case' statement.

@@ -486,6 +486,13 @@ bool DoCatchStmt::isSyntacticallyExhaustive() const {
   return false;
 }
 
+Stmt* ForEachStmt::desugar() const {
+  auto &ctx = this->getDeclContext()->getASTContext();
+    return evaluateOrDefault(ctx.evaluator, 
+                            DesugarForEachStmtRequest{this}, 
+                            nullptr);
+}
+
 Type DoCatchStmt::getExplicitCaughtType() const {
   ASTContext &ctx = DC->getASTContext();
   return CatchNode(const_cast<DoCatchStmt *>(this)).getExplicitCaughtType(ctx);
