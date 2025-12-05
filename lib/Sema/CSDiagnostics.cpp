@@ -869,6 +869,7 @@ GenericArgumentsMismatchFailure::getDiagnosticFor(
   case CTP_EnumCaseRawValue:
   case CTP_ExprPattern:
   case CTP_SingleValueStmtBranch:
+  case CTP_ForEachElement:
     break;
   }
   return std::nullopt;
@@ -2966,6 +2967,7 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
   case CTP_WrappedProperty:
   case CTP_ExprPattern:
   case CTP_SingleValueStmtBranch:
+  case CTP_ForEachElement:
     return std::nullopt;
 
   case CTP_EnumCaseRawValue:
@@ -3752,6 +3754,7 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
   case CTP_CannotFail:
   case CTP_YieldByReference:
   case CTP_ExprPattern:
+  case CTP_ForEachElement:
     break;
   }
   return std::nullopt;

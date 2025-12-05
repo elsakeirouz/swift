@@ -9537,6 +9537,7 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
     case CTP_WrappedProperty:
     case CTP_CannotFail:
     case CTP_SingleValueStmtBranch:
+    case CTP_ForEachElement:
       result.setExpr(rewrittenExpr);
       break;
     }

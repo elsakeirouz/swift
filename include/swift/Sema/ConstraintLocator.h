@@ -84,6 +84,8 @@ enum ContextualTypePurpose : uint8_t {
   CTP_ExprPattern,      ///< `~=` operator application associated with expression
                         /// pattern.
 
+  CTP_ForEachElement,    ///< Element expression associated with `for-in` loop.
+
   CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
 };
 

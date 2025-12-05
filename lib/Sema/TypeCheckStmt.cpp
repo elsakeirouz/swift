@@ -3549,7 +3549,7 @@ static Stmt *desugarForEachStmt(const ForEachStmt* stmt){
 
   auto elementPattern = stmt->getPattern();
   auto optPatternType = OptionalType::get(elementPattern->getType());
-  swift::constraints::SyntacticElementTarget nextTarget(nextCall, dc, CTP_Initialization,
+  swift::constraints::SyntacticElementTarget nextTarget(nextCall, dc, CTP_ForEachElement,
                                       /*contextualType=*/optPatternType,
                                       /*isDiscarded=*/false);
 
