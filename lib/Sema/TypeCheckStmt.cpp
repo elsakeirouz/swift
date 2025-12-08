@@ -3568,9 +3568,15 @@ static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
   auto conditionElement = StmtConditionElement(PBI);
   cond.push_back(conditionElement);
 
+  auto* forBody = stmt->getBody();
+  SmallVector<ASTNode, 2> whileBodyElts;
   // FIXME: handle ForEachStmt "where" clause: stmt->getWhere()
+  // While body = BraceStmt containing where + body
 
-  auto* whileStmt = new (ctx) WhileStmt(stmt->getLabelInfo(), stmt->getForLoc(), cond, stmt->getBody(), true);
+  whileBodyElts.push_back(forBody);
+  auto* whileBody = BraceStmt::create(ctx, forBody->getLBraceLoc(), whileBodyElts, forBody->getRBraceLoc());
+
+  auto* whileStmt = new (ctx) WhileStmt(stmt->getLabelInfo(), stmt->getForLoc(), cond, whileBody, true);
 
   /*
   // IF BORROWING:
@@ -3603,6 +3609,8 @@ static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
 }
 
 BraceStmt* DesugarForEachStmtRequest::evaluate(Evaluator &evaluator, ForEachStmt *stmt) const {
-  auto *whileStmt = desugarForEachStmt(stmt);
-  return whileStmt;
+  auto *braceStmt= desugarForEachStmt(stmt);
+  // FIXME: is this the right place to do this?
+  stmt->setDesugaredStmt(braceStmt);
+  return braceStmt;
 }

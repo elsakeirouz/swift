@@ -1410,7 +1410,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // Do we even want to check whether it is null or not?
   //braceStmt->dump();
   if (braceStmt)
-    visit(braceStmt);
+    visitBraceStmt(braceStmt);
 }
 
 void StmtEmitter::visitBreakStmt(BreakStmt *S) {
