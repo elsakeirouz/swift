@@ -1405,11 +1405,12 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
 }
 
 void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
-  auto* whileStmt = S->desugar();
+  auto* braceStmt = S->desugar();
   // FIXME: what do we do if there was an error while typechecking?
   // Do we even want to check whether it is null or not?
-  if (whileStmt)
-    visit(whileStmt);
+  //braceStmt->dump();
+  if (braceStmt)
+    visit(braceStmt);
 }
 
 void StmtEmitter::visitBreakStmt(BreakStmt *S) {

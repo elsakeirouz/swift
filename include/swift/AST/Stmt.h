@@ -1008,8 +1008,8 @@ class ForEachStmt : public LabeledStmt {
   // Set by Sema:
   ProtocolConformanceRef sequenceConformance = ProtocolConformanceRef();
   Type sequenceType;
-  PatternBindingDecl *iteratorVar = nullptr;
   Expr *nextCall = nullptr;
+  BraceStmt *desugaredStmt = nullptr;
   OpaqueValueExpr *elementExpr = nullptr;
   Expr *convertElementExpr = nullptr;
 
@@ -1026,9 +1026,6 @@ public:
         WhereExpr(WhereExpr), Body(Body) {
     setPattern(Pat);
   }
-
-  void setIteratorVar(PatternBindingDecl *var) { iteratorVar = var; }
-  PatternBindingDecl *getIteratorVar() const { return iteratorVar; }
 
   void setNextCall(Expr *next) { nextCall = next; }
   Expr *getNextCall() const { return nextCall; }
@@ -1077,10 +1074,6 @@ public:
   Expr *getParsedSequence() const { return Sequence; }
   void setParsedSequence(Expr *S) { Sequence = S; }
 
-  /// Type-checked version of the sequence or nullptr if this statement
-  /// yet to be type-checked.
-  Expr *getTypeCheckedSequence() const;
-
   /// getBody - Retrieve the body of the loop.
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *B) { Body = B; }
@@ -1095,7 +1088,9 @@ public:
     return S->getKind() == StmtKind::ForEach;
   }
 
-  Stmt* desugar() const;
+  BraceStmt* desugar();
+  BraceStmt* getDesugaredStmt() const { return desugaredStmt; }
+  void setDesugaredStmt(BraceStmt* newStmt) { desugaredStmt = newStmt; }
 };
 
 /// A pattern and an optional guard expression used in a 'case' statement.

@@ -3317,12 +3317,6 @@ public:
       printRec(S->getWhere(), Label::always("where"));
     }
     printRec(S->getParsedSequence(), Label::optional("parsed_sequence"));
-    if (S->getIteratorVar()) {
-      printRec(S->getIteratorVar(), Label::optional("iterator_var"));
-    }
-    if (S->getNextCall()) {
-      printRec(S->getNextCall(), Label::optional("next_call"));
-    }
     if (S->getConvertElementExpr()) {
       printRec(S->getConvertElementExpr(),
                Label::optional("convert_element_expr"));
@@ -3331,6 +3325,7 @@ public:
       printRec(S->getElementExpr(), Label::optional("element_expr"));
     }
     printRec(S->getBody(), Label::optional("body"));
+    // FIXME: do we want to print the replacement while loop?
     printFoot();
   }
   void visitBreakStmt(BreakStmt *S, Label label) {

@@ -2890,3 +2890,19 @@ void IsCustomAvailabilityDomainPermanentlyEnabled::cacheResult(
   domain->flags.isPermanentlyEnabledComputed = true;
   domain->flags.isPermanentlyEnabled = isPermanentlyEnabled;
 }
+
+//----------------------------------------------------------------------------//
+// DesugarForEachStmtRequest computation.
+//----------------------------------------------------------------------------//
+std::optional<BraceStmt *> DesugarForEachStmtRequest::getCachedResult() const {
+  auto *fes = std::get<0>(getStorage());
+  if (!fes){
+    return std::nullopt;
+  }
+  return fes->getDesugaredStmt();
+}
+
+void DesugarForEachStmtRequest::cacheResult(BraceStmt *stmt) const {
+  auto* fes= std::get<0>(getStorage());
+  fes->setDesugaredStmt(stmt);
+}

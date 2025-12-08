@@ -5808,7 +5808,7 @@ void PrintAST::visitForEachStmt(ForEachStmt *stmt) {
   printPattern(stmt->getPattern());
   Printer << " " << tok::kw_in << " ";
   // FIXME: print container
-  if (auto *seq = stmt->getTypeCheckedSequence()) {
+  if (auto *seq = stmt->getParsedSequence()) {
     // Look through the call to '.makeIterator()'
     
     if (auto *CE = dyn_cast<CallExpr>(seq)) {

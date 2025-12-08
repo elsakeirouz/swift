@@ -5534,8 +5534,8 @@ public:
 
 class DesugarForEachStmtRequest
     : public SimpleRequest<DesugarForEachStmtRequest,
-                           Stmt *(const ForEachStmt*),
-                           RequestFlags::Cached> {
+                           BraceStmt *(ForEachStmt*),
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -5543,10 +5543,12 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  Stmt *evaluate(Evaluator &evaluator, const ForEachStmt *FES) const;
+  BraceStmt *evaluate(Evaluator &evaluator, ForEachStmt *FES) const;
 
 public:
   bool isCached() const { return true; }
+  std::optional<BraceStmt*> getCachedResult() const;
+  void cacheResult(BraceStmt *stmt) const;
 };
 
 #define SWIFT_TYPEID_ZONE TypeChecker

@@ -3433,7 +3433,7 @@ FuncDecl *TypeChecker::getForEachIteratorNextFunction(
   return ctx.getAsyncIteratorNext();
 }
 
-static Stmt *desugarForEachStmt(const ForEachStmt* stmt){
+static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
  auto *parsedSequence = stmt->getParsedSequence();
  auto *dc = stmt->getDeclContext();
  auto &ctx = dc->getASTContext();
@@ -3602,7 +3602,7 @@ static Stmt *desugarForEachStmt(const ForEachStmt* stmt){
   return BraceStmt::create(ctx, stmt->getStartLoc(), stmts, stmt->getEndLoc());
 }
 
-Stmt* DesugarForEachStmtRequest::evaluate(Evaluator &evaluator, const ForEachStmt *stmt) const {
+BraceStmt* DesugarForEachStmtRequest::evaluate(Evaluator &evaluator, ForEachStmt *stmt) const {
   auto *whileStmt = desugarForEachStmt(stmt);
   return whileStmt;
 }

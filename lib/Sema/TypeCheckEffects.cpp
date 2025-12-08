@@ -1996,7 +1996,7 @@ public:
   /// Check to see if the given for-each statement to determine if it
   /// throws or is async.
   Classification classifyForEach(ForEachStmt *stmt) {
-    if (!stmt->getNextCall())
+    if (!stmt->getDesugaredStmt())
       return Classification::forInvalidCode();
 
     // If there is an 'await', the for-each loop is always async.
@@ -2011,10 +2011,10 @@ public:
     }
 
     // Merge the thrown result from the next/nextElement call.
-    result.merge(classifyExpr(stmt->getNextCall(), EffectKind::Throws));
+    result.merge(classifyStmt(stmt->getDesugaredStmt(), EffectKind::Throws));
 
     // Merge unsafe effect from the next/nextElement call.
-    result.merge(classifyExpr(stmt->getNextCall(), EffectKind::Unsafe));
+    result.merge(classifyStmt(stmt->getDesugaredStmt(), EffectKind::Unsafe));
 
     return result;
   }
@@ -4584,7 +4584,7 @@ private:
   ShouldRecurse_t checkForEach(ForEachStmt *S) {
     // Reparent the type-checked sequence on the parsed sequence, so we can
     // find an anchor.
-    if (auto typeCheckedExpr = S->getTypeCheckedSequence()) {
+    if (auto typeCheckedExpr = S->getParsedSequence()) {
       parentMap = typeCheckedExpr->getParentMap();
 
       if (auto parsedSequence = S->getParsedSequence()) {
@@ -4592,6 +4592,7 @@ private:
       }
     }
 
+    // FIXME: do we want to deal with the desugared stmt here or nothing?
     // Note the nextCall expression.
     if (auto nextCall = S->getNextCall()) {
       forEachNextCallExprs.insert(nextCall);

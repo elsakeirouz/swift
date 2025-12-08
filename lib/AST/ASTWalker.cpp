@@ -2079,28 +2079,11 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
       return nullptr;
   }
 
-  // The iterator decl is built directly on top of the sequence
-  // expression, so don't visit both.
-  //
-  // If for-in is already type-checked, the type-checked version
-  // of the sequence is going to be visited as part of `iteratorVar`.
-  if (auto IteratorVar = S->getIteratorVar()) {
-    if (doIt(IteratorVar))
-      return nullptr;
-
-    if (auto NextCall = S->getNextCall()) {
-      if ((NextCall = doIt(NextCall)))
-        S->setNextCall(NextCall);
-      else
-        return nullptr;
-    }
-  } else {
-    if (Expr *Sequence = S->getParsedSequence()) {
+  if (Expr *Sequence = S->getParsedSequence()) {
       if ((Sequence = doIt(Sequence)))
         S->setParsedSequence(Sequence);
       else
         return nullptr;
-    }
   }
 
   if (Expr *Where = S->getWhere()) {
@@ -2123,6 +2106,14 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
     else
       return nullptr;
   }
+
+  if (Stmt *Desugared= S->getDesugaredStmt()) {
+    if ((Desugared = doIt(Desugared)))
+      S->setDesugaredStmt(cast<BraceStmt>(Desugared));
+    else
+      return nullptr;
+  }
+
 
   return S;
 }
