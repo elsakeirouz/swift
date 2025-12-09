@@ -1405,10 +1405,7 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
 }
 
 void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
-  auto* braceStmt = S->desugar();
-  // FIXME: what do we do if there was an error while typechecking?
-  // Do we even want to check whether it is null or not?
-  //braceStmt->dump();
+  auto* braceStmt = S->getDesugaredStmt();
   if (braceStmt)
     visitBraceStmt(braceStmt);
 }

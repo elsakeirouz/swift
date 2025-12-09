@@ -481,7 +481,7 @@ bool DoCatchStmt::isSyntacticallyExhaustive() const {
 
 BraceStmt *ForEachStmt::desugar() {
   auto &ctx = this->getDeclContext()->getASTContext();
-    return evaluateOrDefault(ctx.evaluator, 
+  return evaluateOrDefault(ctx.evaluator,
                             DesugarForEachStmtRequest{this}, 
                             nullptr);
 }

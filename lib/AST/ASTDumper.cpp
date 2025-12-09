@@ -3321,11 +3321,11 @@ public:
       printRec(S->getConvertElementExpr(),
                Label::optional("convert_element_expr"));
     }
-    if (S->getElementExpr()) {
-      printRec(S->getElementExpr(), Label::optional("element_expr"));
-    }
+
     printRec(S->getBody(), Label::optional("body"));
-    // FIXME: do we want to print the replacement while loop?
+
+    printRec(S->getDesugaredStmt(), Label::optional("desugared_loop"));
+
     printFoot();
   }
   void visitBreakStmt(BreakStmt *S, Label label) {

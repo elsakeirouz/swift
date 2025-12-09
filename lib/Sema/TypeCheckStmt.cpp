@@ -138,7 +138,10 @@ namespace {
       if (auto *FS = dyn_cast<FallthroughStmt>(S))
         FS->setDeclContext(ParentDC);
       if (auto *FES = dyn_cast<ForEachStmt>(S))
+      {
         FES->setDeclContext(ParentDC);
+        FES->desugar();
+      }
 
       return Action::Continue(S);
     }
@@ -3448,6 +3451,7 @@ static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
   }
 
   auto opaqueValue = OpaqueValueExpr::createImplicit(ctx, parsedSequence->getType());
+  stmt->setOpaqueSeqExpr(opaqueValue);
 
   std::string name;
   {
@@ -3556,6 +3560,7 @@ static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
   auto nextCallTarget = TypeChecker::typeCheckExpression(nextTarget);
   if (nextCallTarget == std::nullopt)
     return nullptr;
+  nextCall = nextCallTarget->getAsExpr();
 
   SmallVector<StmtConditionElement, 1> cond;
 
@@ -3568,15 +3573,22 @@ static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
   auto conditionElement = StmtConditionElement(PBI);
   cond.push_back(conditionElement);
 
+  auto* continueStmt = new (ctx) ContinueStmt(SourceLoc(), Identifier(),
+      SourceLoc(), /*FIXME: is this correct? */ dc);
+
+  /* for ... in ... where cond { body }
+   * becomes:
+   * while ... { if cond then body else continue }
+   */
+  auto* whereClause = stmt->getWhere();
   auto* forBody = stmt->getBody();
-  SmallVector<ASTNode, 2> whileBodyElts;
-  // FIXME: handle ForEachStmt "where" clause: stmt->getWhere()
-  // While body = BraceStmt containing where + body
 
-  whileBodyElts.push_back(forBody);
-  auto* whileBody = BraceStmt::create(ctx, forBody->getLBraceLoc(), whileBodyElts, forBody->getRBraceLoc());
+  Stmt* whileBody = forBody;
+  if (whereClause)
+    whileBody = new (ctx) IfStmt(whereClause->getStartLoc(), whereClause,
+      forBody, whereClause->getEndLoc(), continueStmt, /*implicit*/ true, ctx);
 
-  auto* whileStmt = new (ctx) WhileStmt(stmt->getLabelInfo(), stmt->getForLoc(), cond, whileBody, true);
+  auto* whileStmt = new (ctx) WhileStmt(stmt->getLabelInfo(), stmt->getForLoc(), ctx.AllocateCopy(cond), whileBody, true);
 
   /*
   // IF BORROWING:
@@ -3609,8 +3621,5 @@ static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
 }
 
 BraceStmt* DesugarForEachStmtRequest::evaluate(Evaluator &evaluator, ForEachStmt *stmt) const {
-  auto *braceStmt= desugarForEachStmt(stmt);
-  // FIXME: is this the right place to do this?
-  stmt->setDesugaredStmt(braceStmt);
-  return braceStmt;
+  return desugarForEachStmt(stmt);
 }

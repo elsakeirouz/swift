@@ -1988,9 +1988,13 @@ public:
           classifier.AsyncKind, /*FIXME:*/PotentialEffectReason::forApply());
     }
 
-    case EffectKind::Unsafe:
-      llvm_unreachable("Unimplemented");
+    case EffectKind::Unsafe: {
+      FunctionUnsafeClassifier classifier(*this);
+      stmt->walk(classifier);
+      return classifier.classification;
     }
+    }
+    llvm_unreachable("Bad effect");
   }
 
   /// Check to see if the given for-each statement to determine if it
@@ -3628,10 +3632,6 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   llvm::DenseMap<Expr *, std::vector<DiagnosticInfo>> uncoveredAsync;
   llvm::DenseMap<Expr *, Expr *> parentMap;
 
-  /// The next/nextElement call expressions within for-in statements we've
-  /// seen.
-  llvm::SmallDenseSet<const Expr *> forEachNextCallExprs;
-  
   /// Expressions that are assumed to be safe because they are being
   /// passed directly into an explicitly `@safe` function.
   llvm::DenseSet<const Expr *> assumedSafeArguments;
@@ -4383,11 +4383,6 @@ private:
                                     /*stopAtAutoClosure=*/false,
                                     EffectKind::Unsafe);
 
-        // We don't diagnose uncovered unsafe uses within the next/nextElement
-        // call, because they're handled already by the for-in loop checking.
-        if (forEachNextCallExprs.contains(anchor))
-          break;
-
         // Figure out a location to use if the unsafe use didn't have one.
         SourceLoc replacementLoc;
         if (anchor)
@@ -4586,17 +4581,15 @@ private:
     // find an anchor.
     if (auto typeCheckedExpr = S->getParsedSequence()) {
       parentMap = typeCheckedExpr->getParentMap();
-
-      if (auto parsedSequence = S->getParsedSequence()) {
-        parentMap[typeCheckedExpr] = parsedSequence;
-      }
     }
 
-    // FIXME: do we want to deal with the desugared stmt here or nothing?
-    // Note the nextCall expression.
-    if (auto nextCall = S->getNextCall()) {
-      forEachNextCallExprs.insert(nextCall);
-    }
+    // Walk everything
+    S->getParsedSequence()->walk(*this);
+    S->getBody()->walk(*this);
+    if (S->getWhere())
+      S->getWhere()->walk(*this);
+
+    S->getDesugaredStmt()->walk(*this);
 
     auto classification = getApplyClassifier().classifyForEach(S);
 
@@ -4638,7 +4631,13 @@ private:
       }
     }
 
-    return ShouldRecurse;
+    if (S->getUnsafeLoc().isValid() && !classification.hasUnsafe()){
+      Ctx.Diags.diagnose(S->getUnsafeLoc(),
+          diag::no_unsafe_in_unsafe_for)
+        .fixItRemove(S->getUnsafeLoc());
+    }
+
+    return ShouldNotRecurse;
   }
 
   ShouldRecurse_t checkDefer(DeferStmt *S) {
@@ -4702,11 +4701,6 @@ private:
       return;
     }
 
-    Ctx.Diags.diagnose(E->getUnsafeLoc(),
-                       forEachNextCallExprs.contains(E)
-                           ? diag::no_unsafe_in_unsafe_for
-                           : diag::no_unsafe_in_unsafe)
-      .fixItRemove(E->getUnsafeLoc());
   }
 
   void noteLabeledConditionalStmt(LabeledConditionalStmt *stmt) {

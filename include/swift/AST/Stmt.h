@@ -1010,8 +1010,8 @@ class ForEachStmt : public LabeledStmt {
   Type sequenceType;
   Expr *nextCall = nullptr;
   BraceStmt *desugaredStmt = nullptr;
-  OpaqueValueExpr *elementExpr = nullptr;
   Expr *convertElementExpr = nullptr;
+  OpaqueValueExpr *sequenceExpr = nullptr;
 
 public:
   ForEachStmt(LabeledStmtInfo LabelInfo, SourceLoc ForLoc, SourceLoc TryLoc,
@@ -1029,9 +1029,6 @@ public:
 
   void setNextCall(Expr *next) { nextCall = next; }
   Expr *getNextCall() const { return nextCall; }
-
-  void setElementExpr(OpaqueValueExpr *expr) { elementExpr = expr; }
-  OpaqueValueExpr *getElementExpr() const { return elementExpr; }
 
   void setConvertElementExpr(Expr *expr) { convertElementExpr = expr; }
   Expr *getConvertElementExpr() const { return convertElementExpr; }
@@ -1091,6 +1088,9 @@ public:
   BraceStmt* desugar();
   BraceStmt* getDesugaredStmt() const { return desugaredStmt; }
   void setDesugaredStmt(BraceStmt* newStmt) { desugaredStmt = newStmt; }
+
+  OpaqueValueExpr* getOpaqueSeqExpr() const { return sequenceExpr; }
+  void setOpaqueSeqExpr(OpaqueValueExpr* expr) { sequenceExpr = expr; }
 };
 
 /// A pattern and an optional guard expression used in a 'case' statement.
