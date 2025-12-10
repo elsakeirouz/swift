@@ -3575,9 +3575,6 @@ static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
   auto conditionElement = StmtConditionElement(PBI);
   cond.push_back(conditionElement);
 
-  auto* continueStmt = new (ctx) ContinueStmt(SourceLoc(), Identifier(),
-      SourceLoc(), /*FIXME: is this correct? */ dc);
-
   /* for ... in ... where cond { body }
    * becomes:
    * while ... { if cond then body else continue }
@@ -3586,9 +3583,19 @@ static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
   auto* forBody = stmt->getBody();
 
   Stmt* whileBody = new (ctx) OpaqueStmt(forBody, forBody->getStartLoc(), forBody->getEndLoc());
+
   if (whereClause)
+  {
+    auto* continueStmt = new (ctx) ContinueStmt(SourceLoc(), Identifier(),
+      SourceLoc(), /*FIXME: is this correct? */ dc);
+
+    SmallVector<ASTNode, 1> thenClause{whileBody};
+    SmallVector<ASTNode, 1> elseClause{continueStmt};
+
     whileBody = new (ctx) IfStmt(whereClause->getStartLoc(), whereClause,
-      forBody, whereClause->getEndLoc(), continueStmt, /*implicit*/ true, ctx);
+      BraceStmt::create(ctx, whileBody->getStartLoc(), thenClause, whileBody->getEndLoc()), whereClause->getEndLoc(),
+      BraceStmt::create(ctx, SourceLoc(), elseClause, SourceLoc()), /*implicit*/ true, ctx);
+  }
 
   auto* whileStmt = new (ctx) WhileStmt(stmt->getLabelInfo(), stmt->getForLoc(), ctx.AllocateCopy(cond), whileBody, true);
 
