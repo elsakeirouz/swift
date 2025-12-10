@@ -1542,6 +1542,30 @@ public:
   }
 };
 
+/// OpaqueStmt - created to serve as an indirection to a ForEachStmt's body
+/// to avoid visiting it twice in the ASTWalker after having desugared the loop.
+/// This ensures we only visit the body once, and this OpaqueStmt will only be
+/// visited to emit the underlying statement in SILGen.
+class OpaqueStmt : public Stmt {
+  SourceLoc StartLoc;
+  SourceLoc EndLoc;
+  BraceStmt *Body; // FIXME: should I just use Stmt * so that this is more versatile?
+  public:
+    OpaqueStmt(BraceStmt* body, SourceLoc startLoc, SourceLoc endLoc)
+    : Stmt(StmtKind::Opaque, true /*always implicit*/),
+      StartLoc(startLoc), EndLoc(endLoc), Body(body) {}
+
+  SourceLoc getLoc() const { return StartLoc; }
+  SourceLoc getStartLoc() const { return StartLoc; }
+  SourceLoc getEndLoc() const { return EndLoc; }
+
+  BraceStmt* getUnderlyingStmt() { return Body; }
+
+  static bool classof(const Stmt *S) {
+    return S->getKind() == StmtKind::Opaque;
+  }
+};
+
 /// BreakStmt - The "break" and "break label" statement.
 class BreakStmt : public Stmt {
   SourceLoc Loc;

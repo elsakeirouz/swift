@@ -1404,7 +1404,50 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
   SGF.BreakContinueDestStack.pop_back();
 }
 
+void StmtEmitter::visitOpaqueStmt(OpaqueStmt *S) {
+  visitBraceStmt(S->getUnderlyingStmt());
+}
+
 void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
+
+ if (auto *expansion =
+          dyn_cast<PackExpansionExpr>(S->getParsedSequence())) {
+    auto formalPackType = dyn_cast<PackType>(
+        PackType::get(SGF.getASTContext(), expansion->getType())
+            ->getCanonicalType());
+
+    std::optional<JumpDest> continueDest;
+    std::optional<JumpDest> breakDest;
+
+    SGF.emitDynamicPackLoop(
+        SILLocation(expansion), formalPackType, 0,
+        expansion->getGenericEnvironment(),
+        [&]() -> SILBasicBlock * {
+          breakDest = createJumpDest(S->getBody());
+          continueDest = createJumpDest(S->getBody());
+          return continueDest->getBlock();
+        },
+        [&](SILValue indexWithinComponent, SILValue packExpansionIndex,
+            SILValue packIndex) {
+          Scope innerForScope(SGF.Cleanups, CleanupLocation(S->getBody()));
+          auto letValueInit =
+              SGF.emitPatternBindingInitialization(S->getPattern(), *continueDest);
+
+          SGF.emitExprInto(expansion->getPatternExpr(), letValueInit.get());
+
+          // Set the destinations for 'break' and 'continue'.
+          SGF.BreakContinueDestStack.push_back({S, *breakDest, *continueDest});
+          visit(S->getBody());
+          SGF.BreakContinueDestStack.pop_back();
+        });
+
+    emitOrDeleteBlock(SGF, *breakDest, S);
+
+    return;
+  }
+
+  SILGenFunction::OpaqueValueRAII pushOpaqueValue(SGF, S->getOpaqueSeqExpr(),
+        SGF.emitRValue(S->getParsedSequence()).getAsSingleValue(SGF, SILLocation(S)));
   auto* braceStmt = S->getDesugaredStmt();
   if (braceStmt)
     visitBraceStmt(braceStmt);

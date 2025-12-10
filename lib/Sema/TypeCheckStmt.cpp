@@ -1525,6 +1525,10 @@ public:
     return S;
   }
 
+  Stmt *visitOpaqueStmt(OpaqueStmt *S) {
+    return S;
+  }
+
   Stmt *visitBreakStmt(BreakStmt *S) {
     // Force the target to be computed in case it produces diagnostics.
     (void)S->getTarget();
@@ -3564,12 +3568,10 @@ static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
 
   SmallVector<StmtConditionElement, 1> cond;
 
-  // type of the pattern
-  // should be able to typecheck call to next with Ooptional type of pattern as
-  // contextual type
-  // build patternbinding decl with that
-  // we need to do selective typechecking
-  auto PBI = ConditionalPatternBindingInfo::create(ctx, SourceLoc(), stmt->getPattern(), nextCall);
+  auto *somePattern = OptionalSomePattern::createImplicit(ctx, stmt->getPattern());
+  somePattern->setType(optPatternType);
+
+  auto PBI = ConditionalPatternBindingInfo::create(ctx, SourceLoc(), somePattern, nextCall);
   auto conditionElement = StmtConditionElement(PBI);
   cond.push_back(conditionElement);
 
@@ -3583,7 +3585,7 @@ static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
   auto* whereClause = stmt->getWhere();
   auto* forBody = stmt->getBody();
 
-  Stmt* whileBody = forBody;
+  Stmt* whileBody = new (ctx) OpaqueStmt(forBody, forBody->getStartLoc(), forBody->getEndLoc());
   if (whereClause)
     whileBody = new (ctx) IfStmt(whereClause->getStartLoc(), whereClause,
       forBody, whereClause->getEndLoc(), continueStmt, /*implicit*/ true, ctx);

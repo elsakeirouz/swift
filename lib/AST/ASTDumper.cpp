@@ -3237,6 +3237,10 @@ public:
     printFlag(S->TrailingSemiLoc.isValid(), "trailing_semi");
   }
 
+  void visitOpaqueStmt(OpaqueStmt *S, Label label){
+    visitBraceStmt(S->getUnderlyingStmt(), label);
+  }
+
   void visitBraceStmt(BraceStmt *S, Label label) {
     printCommon(S, "brace_stmt", label);
     printList(S->getElements(), [&](auto &Elt, Label label) {

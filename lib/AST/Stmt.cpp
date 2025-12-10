@@ -89,6 +89,8 @@ StringRef Stmt::getDescriptiveKindName(StmtKind K) {
     return "discard";
   case StmtKind::PoundAssert:
     return "#assert";
+  case StmtKind::Opaque:
+    return "opaque";
   }
   llvm_unreachable("Unhandled case in switch!");
 }
