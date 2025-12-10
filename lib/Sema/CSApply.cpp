@@ -2758,6 +2758,11 @@ namespace {
       return expr;
     }
 
+    Expr *visitOpaqueExpr(OpaqueExpr *expr) {
+      // Do nothing with error expressions.
+      return expr;
+    }
+
     Expr *visitCodeCompletionExpr(CodeCompletionExpr *expr) {
       // Do nothing with code completion expressions.
       auto toType = simplifyType(cs.getType(expr));

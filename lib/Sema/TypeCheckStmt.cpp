@@ -3582,7 +3582,7 @@ static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
   auto* whereClause = stmt->getWhere();
   auto* forBody = stmt->getBody();
 
-  Stmt* whileBody = new (ctx) OpaqueStmt(forBody, forBody->getStartLoc(), forBody->getEndLoc());
+  Stmt* whileBody = new (ctx) OpaqueStmt(forBody, SourceLoc(), SourceLoc());
 
   if (whereClause)
   {
@@ -3592,8 +3592,10 @@ static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
     SmallVector<ASTNode, 1> thenClause{whileBody};
     SmallVector<ASTNode, 1> elseClause{continueStmt};
 
-    whileBody = new (ctx) IfStmt(whereClause->getStartLoc(), whereClause,
-      BraceStmt::create(ctx, whileBody->getStartLoc(), thenClause, whileBody->getEndLoc()), whereClause->getEndLoc(),
+    whereClause = new (ctx) OpaqueExpr(whereClause);
+
+    whileBody = new (ctx) IfStmt(SourceLoc(), whereClause,
+      BraceStmt::create(ctx, SourceLoc(), thenClause, SourceLoc()), SourceLoc(),
       BraceStmt::create(ctx, SourceLoc(), elseClause, SourceLoc()), /*implicit*/ true, ctx);
   }
 

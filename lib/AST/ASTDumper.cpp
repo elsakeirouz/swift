@@ -4221,6 +4221,10 @@ public:
     printFoot();
   }
 
+  void visitOpaqueExpr(OpaqueExpr *E, Label label){
+    visit(E->getOriginalExpr(), label);
+  }
+
   void visitPropertyWrapperValuePlaceholderExpr(
       PropertyWrapperValuePlaceholderExpr *E, Label label) {
     printCommon(E, "property_wrapper_value_placeholder_expr", label);

@@ -4243,6 +4243,10 @@ namespace {
       return resultType;
     }
 
+    virtual Type visitOpaqueExpr(OpaqueExpr *E) {
+      return E->getOriginalExpr()->getType();
+    }
+
     static bool isTriggerFallbackDiagnosticBuiltin(UnresolvedDotExpr *UDE,
                                                    ASTContext &Context) {
       auto *DRE = dyn_cast<DeclRefExpr>(UDE->getBase());

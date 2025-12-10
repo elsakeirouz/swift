@@ -1546,10 +1546,11 @@ public:
 /// to avoid visiting it twice in the ASTWalker after having desugared the loop.
 /// This ensures we only visit the body once, and this OpaqueStmt will only be
 /// visited to emit the underlying statement in SILGen.
-class OpaqueStmt : public Stmt {
+class OpaqueStmt final : public Stmt {
   SourceLoc StartLoc;
   SourceLoc EndLoc;
   BraceStmt *Body; // FIXME: should I just use Stmt * so that this is more versatile?
+                   // If not, should the class be renamed to be more specific?
   public:
     OpaqueStmt(BraceStmt* body, SourceLoc startLoc, SourceLoc endLoc)
     : Stmt(StmtKind::Opaque, true /*always implicit*/),

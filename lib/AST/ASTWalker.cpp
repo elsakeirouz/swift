@@ -656,6 +656,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
   Expr *visitOpaqueValueExpr(OpaqueValueExpr *E) { return E; }
 
+  Expr *visitOpaqueExpr(OpaqueExpr *E) { return E; }
+
   Expr *visitPropertyWrapperValuePlaceholderExpr(
       PropertyWrapperValuePlaceholderExpr *E) {
     if (E->getOpaqueValuePlaceholder()) {
