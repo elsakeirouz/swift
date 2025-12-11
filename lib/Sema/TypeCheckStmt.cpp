@@ -3486,7 +3486,7 @@ static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
                                      : ctx.getSequenceMakeIterator();
 
   auto *makeIteratorRef = new (ctx) UnresolvedDotExpr(
-        opaqueSeqExpr->getOriginalExpr(), SourceLoc(), DeclNameRef(makeIterator->getName()),
+        opaqueSeqExpr, SourceLoc(), DeclNameRef(makeIterator->getName()),
         DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
   makeIteratorRef->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
 

@@ -1011,7 +1011,6 @@ class ForEachStmt : public LabeledStmt {
   Expr *nextCall = nullptr;
   BraceStmt *desugaredStmt = nullptr;
   Expr *convertElementExpr = nullptr;
-  OpaqueValueExpr *sequenceExpr = nullptr;
 
 public:
   ForEachStmt(LabeledStmtInfo LabelInfo, SourceLoc ForLoc, SourceLoc TryLoc,

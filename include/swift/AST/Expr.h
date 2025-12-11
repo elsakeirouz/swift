@@ -6728,10 +6728,10 @@ public:
   }
 };
 
-/// OpaqueExpr - created to serve as an indirection to a ForEachStmt's where
-/// clause to avoid visiting it twice in the ASTWalker after having desugared the
-/// loop. This will only be processed in SILGen to emit the underlying
-/// expression.
+/// OpaqueExpr - created to serve as an indirection to a ForEachStmt's sequence
+/// expr and where clause to avoid visiting it twice in the ASTWalker after
+/// having desugared the loop. This will only be processed in SILGen to emit
+/// the underlying expression.
 class OpaqueExpr final : public Expr {
   Expr *OriginalExpr;
 
