@@ -3454,8 +3454,7 @@ static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
     parsedSequence = unsafeExpr->getSubExpr();
   }
 
-  auto opaqueValue = OpaqueValueExpr::createImplicit(ctx, parsedSequence->getType());
-  stmt->setOpaqueSeqExpr(opaqueValue);
+  auto opaqueSeqExpr = new (ctx) OpaqueExpr(parsedSequence);
 
   std::string name;
   {
@@ -3487,7 +3486,7 @@ static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
                                      : ctx.getSequenceMakeIterator();
 
   auto *makeIteratorRef = new (ctx) UnresolvedDotExpr(
-        opaqueValue, SourceLoc(), DeclNameRef(makeIterator->getName()),
+        opaqueSeqExpr->getOriginalExpr(), SourceLoc(), DeclNameRef(makeIterator->getName()),
         DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
   makeIteratorRef->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
 

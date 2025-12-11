@@ -1088,9 +1088,6 @@ public:
   BraceStmt* desugar();
   BraceStmt* getDesugaredStmt() const { return desugaredStmt; }
   void setDesugaredStmt(BraceStmt* newStmt) { desugaredStmt = newStmt; }
-
-  OpaqueValueExpr* getOpaqueSeqExpr() const { return sequenceExpr; }
-  void setOpaqueSeqExpr(OpaqueValueExpr* expr) { sequenceExpr = expr; }
 };
 
 /// A pattern and an optional guard expression used in a 'case' statement.

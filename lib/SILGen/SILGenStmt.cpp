@@ -1446,8 +1446,6 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
     return;
   }
 
-  SILGenFunction::OpaqueValueRAII pushOpaqueValue(SGF, S->getOpaqueSeqExpr(),
-        SGF.emitRValue(S->getParsedSequence()).getAsSingleValue(SGF, SILLocation(S)));
   auto* braceStmt = S->getDesugaredStmt();
   if (braceStmt)
     visitBraceStmt(braceStmt);
