@@ -3586,20 +3586,16 @@ static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
 
   if (whereClause)
   {
-    auto* continueStmt = new (ctx) ContinueStmt(SourceLoc(), Identifier(),
-      SourceLoc(), /*FIXME: is this correct? */ dc);
-
     SmallVector<ASTNode, 1> thenClause{whileBody};
-    SmallVector<ASTNode, 1> elseClause{continueStmt};
 
     whereClause = new (ctx) OpaqueExpr(whereClause);
 
     whileBody = new (ctx) IfStmt(SourceLoc(), whereClause,
       BraceStmt::create(ctx, SourceLoc(), thenClause, SourceLoc()), SourceLoc(),
-      BraceStmt::create(ctx, SourceLoc(), elseClause, SourceLoc()), /*implicit*/ true, ctx);
+      nullptr, /*implicit*/ true, ctx);
   }
 
-  auto* whileStmt = new (ctx) WhileStmt(stmt->getLabelInfo(), stmt->getForLoc(), ctx.AllocateCopy(cond), whileBody, true);
+  auto* whileStmt = new (ctx) WhileStmt(stmt->getLabelInfo(), SourceLoc(), ctx.AllocateCopy(cond), whileBody, true);
 
   /*
   // IF BORROWING:
