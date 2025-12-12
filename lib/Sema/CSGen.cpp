@@ -4664,14 +4664,6 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
   bool isAsync = stmt->getAwaitLoc().isValid();
   auto *sequenceExpr = stmt->getParsedSequence();
 
-  // If we have an unsafe expression for the sequence, lift it out of the
-  // sequence expression. We'll put it back after we've introduced the
-  // various calls.
-  UnsafeExpr *unsafeExpr = dyn_cast<UnsafeExpr>(sequenceExpr);
-  if (unsafeExpr) {
-    sequenceExpr = unsafeExpr->getSubExpr();
-  }
-
   auto contextualLocator = cs.getConstraintLocator(
       sequenceExpr, LocatorPathElt::ContextualType(CTP_ForEachSequence));
   auto elementLocator = cs.getConstraintLocator(

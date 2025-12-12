@@ -3465,7 +3465,7 @@ static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
 
   auto *makeIteratorVar = new (ctx)
       VarDecl(/*isStatic=*/false, VarDecl::Introducer::Var,
-          parsedSequence->getStartLoc(),
+          opaqueSeqExpr->getStartLoc(),
           ctx.getIdentifier(name), dc);
   makeIteratorVar->setImplicit();
 
@@ -3493,7 +3493,9 @@ static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
   Expr *makeIteratorCall =
         CallExpr::createImplicitEmpty(ctx, makeIteratorRef);
 
-    // Swap in the 'unsafe' expression.
+  // FIXME: commenting this out "fixes" a redundant visit of the sequence's init
+  // expr. We need to investigate this.
+  // Swap in the 'unsafe' expression.
   if (unsafeExpr) {
     unsafeExpr->setSubExpr(makeIteratorCall);
     makeIteratorCall = unsafeExpr;
