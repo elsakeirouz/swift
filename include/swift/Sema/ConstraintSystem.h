@@ -3758,26 +3758,6 @@ public:
     }
   }
 
-  /// Add a value witness constraint to the constraint system.
-  void addValueWitnessConstraint(
-      Type baseTy, ValueDecl *requirement, Type memberTy, DeclContext *useDC,
-      FunctionRefInfo functionRefInfo, ConstraintLocatorBuilder locator) {
-    assert(baseTy);
-    assert(memberTy);
-    assert(requirement);
-    assert(useDC);
-    switch (simplifyValueWitnessConstraint(
-        ConstraintKind::ValueWitness, baseTy, requirement, memberTy, useDC,
-        functionRefInfo, TMF_GenerateConstraints, locator)) {
-    case SolutionKind::Unsolved:
-      llvm_unreachable("Unsolved result when generating constraints!");
-
-    case SolutionKind::Solved:
-    case SolutionKind::Error:
-      break;
-    }
-  }
-
   /// Add an explicit conversion constraint (e.g., \c 'x as T').
   ///
   /// \param fromType The type of the expression being converted.
@@ -5016,12 +4996,6 @@ private:
       DeclContext *useDC, FunctionRefInfo functionRefInfo,
       ArrayRef<OverloadChoice> outerAlternatives, TypeMatchOptions flags,
       ConstraintLocatorBuilder locator);
-
-  /// Attempt to simplify the given value witness constraint.
-  SolutionKind simplifyValueWitnessConstraint(
-      ConstraintKind kind, Type baseType, ValueDecl *member, Type memberType,
-      DeclContext *useDC, FunctionRefInfo functionRefInfo,
-      TypeMatchOptions flags, ConstraintLocatorBuilder locator);
 
   /// Attempt to simplify the ForEachElement constraint.
   SolutionKind
