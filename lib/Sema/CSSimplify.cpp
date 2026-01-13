@@ -2186,6 +2186,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::LiteralConformsTo:
+  case ConstraintKind::ForEachElement:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
@@ -2550,6 +2551,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::LiteralConformsTo:
+  case ConstraintKind::ForEachElement:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
@@ -3283,6 +3285,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::LiteralConformsTo:
+  case ConstraintKind::ForEachElement:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
@@ -7361,6 +7364,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::KeyPath:
     case ConstraintKind::KeyPathApplication:
     case ConstraintKind::LiteralConformsTo:
+    case ConstraintKind::ForEachElement:
     case ConstraintKind::OptionalObject:
     case ConstraintKind::UnresolvedValueMember:
     case ConstraintKind::ValueMember:
@@ -9820,6 +9824,86 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   }
 
   llvm_unreachable("Unhandled CheckedCastKind in switch.");
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyForEachElementConstraint(
+    Type first, Type second, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
+  auto loc = getConstraintLocator(locator);
+  Type seqTy = getFixedTypeRecursive(first, flags, /*wantRValue=*/true);
+
+  if (seqTy->isTypeVariableOrMember()) {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(Constraint::create(
+          *this, ConstraintKind::ForEachElement, first, second, loc));
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  }
+
+  if (seqTy->isPlaceholder()) {
+    recordTypeVariablesAsHoles(second);
+    return SolutionKind::Solved;
+  }
+
+  auto anchor = locator.getAnchor();
+  auto sequenceTy =
+      getContextualTypeInfo(anchor)->getType()->castTo<ProtocolType>();
+  auto *sequenceProto = sequenceTy->getDecl();
+
+  auto *seqTypeVar = createTypeVariable(loc, TVO_PrefersSubtypeBinding);
+  auto *elementAssocType = sequenceProto->getAssociatedType(Context.Id_Element);
+  auto elementType = DependentMemberType::get(seqTypeVar, elementAssocType);
+
+  Type resultElementType = elementType;
+  if (seqTy->isExistentialType()) {
+    auto openedSeq = openAnyExistentialType(seqTy, loc);
+    addConstraint(ConstraintKind::Bind, seqTypeVar, openedSeq.first, locator);
+
+    resultElementType = typeEraseOpenedExistentialReference(
+        elementType, seqTy, seqTypeVar, TypePosition::Covariant);
+  } else {
+    addConstraint(ConstraintKind::Bind, seqTypeVar, seqTy, locator);
+  }
+
+  auto *contextualLoc = getConstraintLocator(
+      anchor, LocatorPathElt::ContextualType(CTP_ForEachSequence));
+
+  // Add a conformance constraint since this handles things like conditional
+  // constraints and unavailable conformances.
+  addConstraint(ConstraintKind::ConformsTo, seqTypeVar, sequenceTy,
+                contextualLoc);
+
+  // We also need to directly check that the sequence type actually conforms to
+  // Sequence, recording a fix if the conformance is invalid. This is necessary
+  // since otherwise DependentMemberType just silently becomes a hole without
+  // a fix.
+  // FIXME: We ought to model DependentMemberType as a constraint, which should
+  // take care of this instead.
+  auto conformance = lookupConformance(
+      getFixedTypeRecursive(seqTypeVar, /*wantRValue*/ true), sequenceProto);
+
+  // If we have no conformance, we'll record a fix in the ConformsTo constraint.
+  if (!conformance) {
+    increaseScore(SK_Hole, locator);
+    recordTypeVariablesAsHoles(second);
+    return SolutionKind::Solved;
+  }
+  // If we have an invalid conformance, this won't be handled by ConformsTo, so
+  // record a fix.
+  if (conformance.getTypeWitness(elementAssocType)->hasError()) {
+    recordFix(IgnoreInvalidASTNode::create(*this, loc));
+    recordTypeVariablesAsHoles(second);
+    return SolutionKind::Solved;
+  }
+
+  resultElementType = getFixedTypeRecursive(resultElementType,
+                                            /*rvalue*/ false);
+  addConstraint(ConstraintKind::Conversion,
+                resultElementType->getDesugaredType(), second, locator);
+  return SolutionKind::Solved;
 }
 
 ConstraintSystem::SolutionKind
@@ -16328,6 +16412,9 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::CheckedCast:
     return simplifyCheckedCastConstraint(first, second, subflags, locator);
 
+  case ConstraintKind::ForEachElement:
+    return simplifyForEachElementConstraint(first, second, subflags, locator);
+
   case ConstraintKind::OptionalObject:
     return simplifyOptionalObjectConstraint(first, second, subflags, locator);
 
@@ -16966,6 +17053,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     }
     return result;
   }
+
+  case ConstraintKind::ForEachElement:
+    return simplifyForEachElementConstraint(
+        constraint.getFirstType(), constraint.getSecondType(),
+        /*flags*/ std::nullopt, constraint.getLocator());
 
   case ConstraintKind::OptionalObject:
     return simplifyOptionalObjectConstraint(
