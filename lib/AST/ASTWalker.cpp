@@ -2071,28 +2071,11 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
       return nullptr;
   }
 
-  // The iterator decl is built directly on top of the sequence
-  // expression, so don't visit both.
-  //
-  // If for-in is already type-checked, the type-checked version
-  // of the sequence is going to be visited as part of `iteratorVar`.
-  if (auto IteratorVar = S->getIteratorVar()) {
-    if (doIt(IteratorVar))
+  if (Expr *Sequence = S->getParsedSequence()) {
+    if ((Sequence = doIt(Sequence)))
+      S->setParsedSequence(Sequence);
+    else
       return nullptr;
-
-    if (auto NextCall = S->getNextCall()) {
-      if ((NextCall = doIt(NextCall)))
-        S->setNextCall(NextCall);
-      else
-        return nullptr;
-    }
-  } else {
-    if (Expr *Sequence = S->getParsedSequence()) {
-      if ((Sequence = doIt(Sequence)))
-        S->setParsedSequence(Sequence);
-      else
-        return nullptr;
-    }
   }
 
   if (Expr *Where = S->getWhere()) {
@@ -2102,16 +2085,16 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
       return nullptr;
   }
 
-  if (auto IteratorNext = S->getConvertElementExpr()) {
-    if ((IteratorNext = doIt(IteratorNext)))
-      S->setConvertElementExpr(IteratorNext);
+  if (Stmt *Body = S->getBody()) {
+    if ((Body = doIt(Body)))
+      S->setBody(cast<BraceStmt>(Body));
     else
       return nullptr;
   }
 
-  if (Stmt *Body = S->getBody()) {
-    if ((Body = doIt(Body)))
-      S->setBody(cast<BraceStmt>(Body));
+  if (Stmt *Desugared = S->getCachedDesugaredStmt()) {
+    if ((Desugared = doIt(Desugared)))
+      S->setDesugaredStmt(cast<BraceStmt>(Desugared));
     else
       return nullptr;
   }

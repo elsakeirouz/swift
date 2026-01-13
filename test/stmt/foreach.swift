@@ -364,3 +364,16 @@ func testInvalidPreamble() {
     _ = "" as Int // expected-error {{cannot convert value of type 'String' to type 'Int' in coercion}}
   }
 }
+
+func testFlatMap() {
+  struct S {
+    var ys: [Int]
+  }
+  func foo(_ xs: [S]) {
+    // Make sure we pick the flattening overload instead of the compactMap
+    // compatibility overload.
+    for x in xs.flatMap({ $0.ys }) {
+      let _: Int = x
+    }
+  }
+}

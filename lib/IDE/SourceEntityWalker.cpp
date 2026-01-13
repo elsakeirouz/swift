@@ -270,29 +270,71 @@ ASTWalker::PostWalkAction SemaAnnotator::walkToDeclPostProper(Decl *D) {
 
 ASTWalker::PreWalkResult<Stmt *> SemaAnnotator::walkToStmtPre(Stmt *S) {
   bool TraverseChildren = SEWalker.walkToStmtPre(S);
-  if (TraverseChildren) {
-    if (auto *DeferS = dyn_cast<DeferStmt>(S)) {
-      // Since 'DeferStmt::getTempDecl()' is marked as implicit, we manually
-      // walk into the body.
-      if (auto *FD = DeferS->getTempDecl()) {
-        auto *Body = FD->getBody();
-        if (!Body)
-          return Action::Stop();
+  if (!TraverseChildren)
+    return Action::SkipNode(S);
 
-        auto *RetS = Body->walk(*this);
-        if (!RetS)
-          return Action::Stop();
-        assert(RetS == Body);
-      }
-      bool Continue = SEWalker.walkToStmtPost(DeferS);
-      if (!Continue)
+  if (auto *DeferS = dyn_cast<DeferStmt>(S)) {
+    // Since 'DeferStmt::getTempDecl()' is marked as implicit, we manually
+    // walk into the body.
+    if (auto *FD = DeferS->getTempDecl()) {
+      auto *Body = FD->getBody();
+      if (!Body)
         return Action::Stop();
 
-      // Already walked children.
-      return Action::SkipNode(DeferS);
+      auto *RetS = Body->walk(*this);
+      if (!RetS)
+        return Action::Stop();
+      assert(RetS == Body);
     }
+    bool Continue = SEWalker.walkToStmtPost(DeferS);
+    if (!Continue)
+      return Action::Stop();
+
+    // Already walked children.
+    return Action::SkipNode(DeferS);
   }
-  return Action::VisitNodeIf(TraverseChildren, S);
+
+  if (auto *ForEachS = dyn_cast<ForEachStmt>(S)) {
+    auto *Pattern = ForEachS->getPattern();
+    auto *RetPattern = Pattern->walk(*this);
+    if (!RetPattern)
+      return Action::Stop();
+    assert(RetPattern == Pattern);
+
+    auto *Seq = ForEachS->getSequence();
+    auto *RetSeq = Seq->walk(*this);
+    if (!RetSeq)
+      return Action::Stop();
+    assert(RetSeq == Seq);
+
+    if (auto *Where = ForEachS->getWhere()) {
+      auto *RetWhere = Where->walk(*this);
+      if (!RetWhere)
+        return Action::Stop();
+      assert(RetWhere == Where);
+    }
+
+    auto *Body = ForEachS->getBody();
+    auto *RetBody = ForEachS->getBody()->walk(*this);
+    if (!RetBody)
+      return Action::Stop();
+    assert(RetBody == Body);
+
+    if (SEWalker.shouldWalkIntoForEachDesugaredStmt()) {
+      auto *DesugaredStmt = ForEachS->getDesugaredStmt();
+      if (DesugaredStmt) {
+        auto *RetDesugaredStmt = DesugaredStmt->walk(*this);
+        if (!RetDesugaredStmt)
+          return Action::Stop();
+        assert(RetDesugaredStmt == DesugaredStmt);
+      }
+    }
+
+    // Already walked children.
+    return Action::SkipChildren(ForEachS);
+  }
+
+  return Action::Continue(S);
 }
 
 ASTWalker::PostWalkResult<Stmt *> SemaAnnotator::walkToStmtPost(Stmt *S) {

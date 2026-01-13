@@ -1023,49 +1023,32 @@ class ForEachStmt : public LabeledStmt {
   SourceLoc WhereLoc;
   Expr *WhereExpr = nullptr;
   BraceStmt *Body;
+  DeclContext *DC = nullptr;
 
   // Set by Sema:
-  ProtocolConformanceRef sequenceConformance = ProtocolConformanceRef();
-  Type sequenceType;
-  PatternBindingDecl *iteratorVar = nullptr;
-  Expr *nextCall = nullptr;
-  OpaqueValueExpr *elementExpr = nullptr;
-  Expr *convertElementExpr = nullptr;
+  llvm::PointerIntPair<BraceStmt *, 1, bool> desugaredStmtAndComputed;
+  OpaqueValueExpr *opaqueSequence = nullptr;
+  OpaqueValueExpr *opaqueWhere = nullptr;
+  OpaqueStmt *opaqueBodyStmt = nullptr;
+  // Used to map Continue and Break targets to a desugared ForEachStmt's
+  // corresponding WhileStmt.
+  WhileStmt *continueTarget = nullptr;
+  WhileStmt *breakTarget = nullptr;
+
+  friend class DesugarForEachStmtRequest;
 
 public:
   ForEachStmt(LabeledStmtInfo LabelInfo, SourceLoc ForLoc, SourceLoc TryLoc,
               SourceLoc AwaitLoc, SourceLoc UnsafeLoc, Pattern *Pat,
-              SourceLoc InLoc, Expr *Sequence,
-              SourceLoc WhereLoc, Expr *WhereExpr, BraceStmt *Body,
+              SourceLoc InLoc, Expr *Sequence, SourceLoc WhereLoc,
+              Expr *WhereExpr, BraceStmt *Body, DeclContext *DC,
               std::optional<bool> implicit = std::nullopt)
       : LabeledStmt(StmtKind::ForEach, getDefaultImplicitFlag(implicit, ForLoc),
                     LabelInfo),
-        ForLoc(ForLoc), TryLoc(TryLoc), AwaitLoc(AwaitLoc), UnsafeLoc(UnsafeLoc),
-        Pat(nullptr), InLoc(InLoc), Sequence(Sequence), WhereLoc(WhereLoc),
-        WhereExpr(WhereExpr), Body(Body) {
+        ForLoc(ForLoc), TryLoc(TryLoc), AwaitLoc(AwaitLoc),
+        UnsafeLoc(UnsafeLoc), Pat(nullptr), InLoc(InLoc), Sequence(Sequence),
+        WhereLoc(WhereLoc), WhereExpr(WhereExpr), Body(Body), DC(DC) {
     setPattern(Pat);
-  }
-
-  void setIteratorVar(PatternBindingDecl *var) { iteratorVar = var; }
-  PatternBindingDecl *getIteratorVar() const { return iteratorVar; }
-
-  void setNextCall(Expr *next) { nextCall = next; }
-  Expr *getNextCall() const { return nextCall; }
-
-  void setElementExpr(OpaqueValueExpr *expr) { elementExpr = expr; }
-  OpaqueValueExpr *getElementExpr() const { return elementExpr; }
-
-  void setConvertElementExpr(Expr *expr) { convertElementExpr = expr; }
-  Expr *getConvertElementExpr() const { return convertElementExpr; }
-
-  void setSequenceConformance(Type type,
-                              ProtocolConformanceRef conformance) {
-    sequenceType = type;
-    sequenceConformance = conformance;
-  }
-  Type getSequenceType() const { return sequenceType; }
-  ProtocolConformanceRef getSequenceConformance() const {
-    return sequenceConformance;
   }
 
   /// getForLoc - Retrieve the location of the 'for' keyword.
@@ -1096,9 +1079,15 @@ public:
   Expr *getParsedSequence() const { return Sequence; }
   void setParsedSequence(Expr *S) { Sequence = S; }
 
-  /// Type-checked version of the sequence or nullptr if this statement
-  /// yet to be type-checked.
-  Expr *getTypeCheckedSequence() const;
+  /// The opaque expression used to represent the sequence expression in the
+  /// desugared `while` loop.
+  OpaqueValueExpr *getOpaqueSequenceExpr() const { return opaqueSequence; }
+  void setOpaqueSequenceExpr(OpaqueValueExpr *E) { opaqueSequence = E; }
+
+  /// The opaque expression used to represent the `where` expression in the
+  /// desugared `while` loop.
+  OpaqueValueExpr *getOpaqueWhereExpr() const { return opaqueWhere; }
+  void setOpaqueWhereExpr(OpaqueValueExpr *E) { opaqueWhere = E; }
 
   /// getBody - Retrieve the body of the loop.
   BraceStmt *getBody() const { return Body; }
@@ -1106,7 +1095,35 @@ public:
   
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(ForLoc); }
   SourceLoc getEndLoc() const { return Body->getEndLoc(); }
-  
+
+  DeclContext *getDeclContext() const { return DC; }
+  void setDeclContext(DeclContext *newDC) { DC = newDC; }
+
+  /// getDesugaredStmt - Returns the semantic WhileStmt.
+  BraceStmt *getDesugaredStmt();
+  BraceStmt *getCachedDesugaredStmt() const {
+    return desugaredStmtAndComputed.getPointer();
+  }
+  void setDesugaredStmt(BraceStmt *newStmt) {
+    desugaredStmtAndComputed.setPointer(newStmt);
+  }
+
+  /// getOpaqueBodyStmt - Retrieve the Opaque statement wrapping the
+  /// ForEachStmt's body in the desugared statement to avoid duplicate
+  /// traversal.
+  OpaqueStmt *getOpaqueBodyStmt() { return opaqueBodyStmt; }
+  void setOpaqueBodyStmt(OpaqueStmt *newStmt) { opaqueBodyStmt = newStmt; }
+
+  /// getContinueTarget - Retrieve the WhileStmt Continue should target once
+  /// the ForEachStmt has been desugared.
+  WhileStmt *getContinueTarget() { return continueTarget; }
+  void setContinueTarget(WhileStmt *target) { continueTarget = target; }
+
+  /// getBreakTarget - Retrieve the WhileStmt Break should target once
+  /// the ForEachStmt has been desugared.
+  WhileStmt *getBreakTarget() { return breakTarget; }
+  void setBreakTarget(WhileStmt *target) { breakTarget = target; }
+
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::ForEach;
   }

@@ -137,6 +137,13 @@ namespace {
         CS->setDeclContext(ParentDC);
       if (auto *FS = dyn_cast<FallthroughStmt>(S))
         FS->setDeclContext(ParentDC);
+      if (auto *FES = dyn_cast<ForEachStmt>(S)) {
+        FES->setDeclContext(ParentDC);
+        // Make sure the desugared `while` statement is computed such that
+        // we contextualize it, and to ensure it's present for other subsequent
+        // type-checker walks.
+        FES->getDesugaredStmt();
+      }
 
       return Action::Continue(S);
     }
@@ -3431,4 +3438,217 @@ FuncDecl *TypeChecker::getForEachIteratorNextFunction(
 
   // Fall back to AsyncIteratorProtocol.next().
   return ctx.getAsyncIteratorNext();
+}
+
+static BraceStmt *desugarForEachStmt(ForEachStmt *stmt) {
+  auto *parsedSequence = stmt->getParsedSequence();
+
+  if (isa<PackExpansionExpr>(parsedSequence))
+    return nullptr;
+
+  if (!parsedSequence->getType() ||
+      (stmt->getWhere() && !stmt->getWhere()->getType()))
+    return nullptr;
+
+  if (parsedSequence->getType()->hasError() ||
+      stmt->getPattern()->getType()->hasError() ||
+      (stmt->getWhere() && stmt->getWhere()->getType()->hasError()))
+    return nullptr;
+
+  auto *dc = stmt->getDeclContext();
+  auto &ctx = dc->getASTContext();
+  bool isAsync = stmt->getAwaitLoc().isValid();
+
+  auto *opaqueSeqExpr = new (ctx) OpaqueValueExpr(
+      parsedSequence->getSourceRange(), parsedSequence->getType());
+  stmt->setOpaqueSequenceExpr(opaqueSeqExpr);
+
+  std::string name;
+  {
+    if (auto np = dyn_cast_or_null<NamedPattern>(stmt->getPattern()))
+      name = "$" + np->getBoundName().str().str();
+    name += "$generator";
+  }
+
+  auto *makeIteratorVar = new (ctx)
+      VarDecl(/*isStatic=*/false, VarDecl::Introducer::Var,
+              opaqueSeqExpr->getStartLoc(), ctx.getIdentifier(name), dc);
+  makeIteratorVar->setImplicit();
+
+  // Async iterators are not `Sendable`; they're only meant to be used from
+  // the isolation domain that creates them. But the `next()` method runs on
+  // the generic executor, so calling it from an actor-isolated context passes
+  // non-`Sendable` state across the isolation boundary. `next()` should
+  // inherit the isolation of the caller, but for now, use the opt out.
+  if (isAsync) {
+    auto *nonisolated =
+        NonisolatedAttr::createImplicit(ctx, NonIsolatedModifier::Unsafe);
+    makeIteratorVar->addAttribute(nonisolated);
+  }
+
+  // First, let's form a call from sequence to `.makeIterator()` and save
+  // that in a special variable which is going to be used by SILGen.
+  FuncDecl *makeIterator = isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
+                                   : ctx.getSequenceMakeIterator();
+
+  auto sequenceProto = isAsync
+                           ? ctx.getProtocol(KnownProtocolKind::AsyncSequence)
+                           : ctx.getProtocol(KnownProtocolKind::Sequence);
+  auto seqConformanceRef =
+      lookupConformance(parsedSequence->getType(), sequenceProto);
+  ConcreteDeclRef witness;
+  if (parsedSequence->getType()->isExistentialType())
+    witness = ConcreteDeclRef(makeIterator);
+  else {
+    witness = seqConformanceRef.getWitnessByName(makeIterator->getName());
+  }
+
+  auto *makeIteratorRef = new (ctx)
+      MemberRefExpr(opaqueSeqExpr, stmt->getForLoc(), witness,
+                    DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
+
+  Expr *makeIteratorCall = CallExpr::createImplicitEmpty(ctx, makeIteratorRef);
+
+  Pattern *pattern = NamedPattern::createImplicit(ctx, makeIteratorVar);
+  auto *PB = PatternBindingDecl::createImplicit(ctx, StaticSpellingKind::None,
+                                                pattern, makeIteratorCall, dc);
+
+  // The result type of `.makeIterator()` is used to form a call to
+  // `.next()`. `next()` is called on each iteration of the loop.
+  FuncDecl *nextFn = TypeChecker::getForEachIteratorNextFunction(
+      dc, stmt->getForLoc(), isAsync);
+  TinyPtrVector<Identifier> labels;
+  if (nextFn && nextFn->getParameters()->size() == 1)
+    labels.push_back(ctx.Id_isolation);
+  auto *makeIteratorVarRef =
+      new (ctx) DeclRefExpr(makeIteratorVar, DeclNameLoc(),
+                            /*Implicit=*/true);
+
+  ConcreteDeclRef iteratorWitness;
+  if (parsedSequence->getType()->isExistentialType())
+    iteratorWitness = ConcreteDeclRef(nextFn);
+  else {
+    auto iteratorId = isAsync ? ctx.Id_AsyncIterator : ctx.Id_Iterator;
+    auto associatedType = sequenceProto->getAssociatedType(iteratorId);
+    auto typeWitness = seqConformanceRef.getTypeWitness(associatedType);
+    auto iteratorConformanceRef = lookupConformance(
+        typeWitness, cast<ProtocolDecl>(nextFn->getDeclContext()));
+    iteratorWitness =
+        iteratorConformanceRef.getWitnessByName(nextFn->getName());
+  }
+
+  auto *nextRef = new (ctx)
+      MemberRefExpr(makeIteratorVarRef, stmt->getForLoc(), iteratorWitness,
+                    DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
+
+  ArgumentList *nextArgs;
+  if (nextFn && nextFn->getParameters()->size() == 1) {
+    auto isolationArg =
+        new (ctx) CurrentContextIsolationExpr(stmt->getForLoc(), Type());
+    nextArgs = ArgumentList::createImplicit(
+        ctx, {Argument(SourceLoc(), ctx.Id_isolation, isolationArg)});
+  } else {
+    nextArgs = ArgumentList::createImplicit(ctx, {});
+  }
+  Expr *nextCall = CallExpr::createImplicit(ctx, nextRef, nextArgs);
+
+  // Wrap the 'next' call in 'unsafe', if the loop is async (in which case
+  // the iterator variable is nonisolated(unsafe).
+  if (isAsync &&
+      ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete) {
+    SourceLoc loc = stmt->getUnsafeLoc();
+    if (loc.isInvalid())
+      loc = stmt->getForLoc();
+    nextCall = UnsafeExpr::createImplicit(ctx, loc, nextCall);
+  }
+
+  auto nextCallVar = new (ctx)
+      VarDecl(/*isStatic=*/false, VarDecl::Introducer::Let,
+              nextCall->getStartLoc(), ctx.getIdentifier("$element"), dc);
+  nextCallVar->setImplicit();
+
+  NamedPattern *nextCallVarPattern =
+      NamedPattern::createImplicit(ctx, nextCallVar);
+  auto *nextCallVarRef =
+      new (ctx) DeclRefExpr(nextCallVar, DeclNameLoc(), /*Implicit=*/true);
+
+  auto elementPattern = stmt->getPattern();
+
+  SmallVector<StmtConditionElement, 1> cond;
+
+  auto *somePattern =
+      OptionalSomePattern::createImplicit(ctx, nextCallVarPattern);
+
+  auto PBI = ConditionalPatternBindingInfo::create(ctx, SourceLoc(),
+                                                   somePattern, nextCall);
+  auto conditionElement = StmtConditionElement(PBI);
+  cond.push_back(conditionElement);
+
+  SmallVector<ASTNode> whileBodyElements;
+
+  auto *opaquePattern = new (ctx) OpaquePattern(elementPattern);
+
+  if (!elementPattern->isRefutablePattern()) {
+    auto PBD = PatternBindingDecl::createImplicit(
+        ctx, StaticSpellingKind::None, opaquePattern, nextCallVarRef, dc);
+    whileBodyElements.push_back(PBD);
+  }
+
+  /* for ... in ... where cond { body }
+   * becomes:
+   * while ... { if cond then body else continue }
+   */
+  auto *whereClause = stmt->getWhere();
+
+  OpaqueStmt *opaqueForBody = new (ctx) OpaqueStmt();
+  stmt->setOpaqueBodyStmt(opaqueForBody);
+
+  if (whereClause || elementPattern->isRefutablePattern()) {
+    SmallVector<StmtConditionElement, 1> internalConditions;
+    SmallVector<ASTNode, 1> thenClause{opaqueForBody};
+
+    if (elementPattern->isRefutablePattern()) {
+      auto PBI = ConditionalPatternBindingInfo::create(
+          ctx, SourceLoc(), opaquePattern, nextCallVarRef);
+      auto conditionElement = StmtConditionElement(PBI);
+      internalConditions.push_back(conditionElement);
+    }
+
+    if (whereClause) {
+      auto *opaqueWhere = new (ctx) OpaqueValueExpr(
+          whereClause->getSourceRange(), whereClause->getType());
+      stmt->setOpaqueWhereExpr(opaqueWhere);
+      internalConditions.push_back(opaqueWhere);
+    }
+
+    whileBodyElements.push_back(new (ctx) IfStmt(
+        LabeledStmtInfo(), SourceLoc(), ctx.AllocateCopy(internalConditions),
+        BraceStmt::createImplicit(ctx, thenClause), SourceLoc(), nullptr,
+        /*implicit*/ true));
+  } else
+    whileBodyElements.push_back(opaqueForBody);
+
+  auto *whileStmt = new (ctx)
+      WhileStmt(LabeledStmtInfo(), SourceLoc(), ctx.AllocateCopy(cond),
+                BraceStmt::createImplicit(ctx, whileBodyElements), true);
+  stmt->setBreakTarget(whileStmt);
+  stmt->setContinueTarget(whileStmt);
+
+  SmallVector<ASTNode, 2> stmts;
+  stmts.push_back(PB);
+  stmts.push_back(whileStmt);
+
+  auto *braceStmt =
+      BraceStmt::create(ctx, stmt->getStartLoc(), stmts, stmt->getEndLoc());
+
+  bool HadError = StmtChecker(stmt->getDeclContext()).typeCheckStmt(braceStmt);
+  if (HadError)
+    return nullptr;
+
+  return braceStmt;
+}
+
+BraceStmt *DesugarForEachStmtRequest::evaluate(Evaluator &evaluator,
+                                               ForEachStmt *stmt) const {
+  return desugarForEachStmt(stmt);
 }
