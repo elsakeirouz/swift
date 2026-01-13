@@ -261,6 +261,25 @@ public:
   Pattern *walk(ASTWalker &&walker) { return walk(walker); }
 };
 
+class OpaquePattern : public Pattern {
+  Pattern *SubPattern = nullptr;
+
+public:
+  OpaquePattern(Pattern *p) : Pattern(PatternKind::Opaque), SubPattern(p) {
+    setImplicit();
+  }
+
+  SourceLoc getLoc() const { return SourceLoc(); }
+  SourceRange getSourceRange() const { return SourceRange(); }
+
+  Pattern *getSubPattern() const { return SubPattern; }
+  void setSubPattern(Pattern *p) { SubPattern = p; }
+
+  static bool classof(const Pattern *P) {
+    return P->getKind() == PatternKind::Opaque;
+  }
+};
+
 /// A pattern consisting solely of grouping parentheses around a
 /// different pattern.
 class ParenPattern : public Pattern {
