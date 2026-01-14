@@ -3441,7 +3441,7 @@ FuncDecl *TypeChecker::getForEachIteratorNextFunction(
 }
 
 static BraceStmt *desugarForEachStmt(ForEachStmt *stmt) {
-  auto *parsedSequence = stmt->getParsedSequence();
+  auto *parsedSequence = stmt->getSequence();
 
   if (isa<PackExpansionExpr>(parsedSequence))
     return nullptr;
