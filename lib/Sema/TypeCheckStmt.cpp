@@ -3440,28 +3440,10 @@ FuncDecl *TypeChecker::getForEachIteratorNextFunction(
   return ctx.getAsyncIteratorNext();
 }
 
-static BraceStmt *desugarForEachStmt(ForEachStmt *stmt) {
-  auto *parsedSequence = stmt->getSequence();
-
-  if (isa<PackExpansionExpr>(parsedSequence))
-    return nullptr;
-
-  if (!parsedSequence->getType() ||
-      (stmt->getWhere() && !stmt->getWhere()->getType()))
-    return nullptr;
-
-  if (parsedSequence->getType()->hasError() ||
-      stmt->getPattern()->getType()->hasError() ||
-      (stmt->getWhere() && stmt->getWhere()->getType()->hasError()))
-    return nullptr;
-
+static VarDecl *buildMakeIteratorVar(ForEachStmt *stmt) {
+  bool isAsync = stmt->getAwaitLoc().isValid();
   auto *dc = stmt->getDeclContext();
   auto &ctx = dc->getASTContext();
-  bool isAsync = stmt->getAwaitLoc().isValid();
-
-  auto *opaqueSeqExpr = new (ctx) OpaqueValueExpr(
-      parsedSequence->getSourceRange(), parsedSequence->getType());
-  stmt->setOpaqueSequenceExpr(opaqueSeqExpr);
 
   std::string name;
   {
@@ -3472,7 +3454,7 @@ static BraceStmt *desugarForEachStmt(ForEachStmt *stmt) {
 
   auto *makeIteratorVar = new (ctx)
       VarDecl(/*isStatic=*/false, VarDecl::Introducer::Var,
-              opaqueSeqExpr->getStartLoc(), ctx.getIdentifier(name), dc);
+              stmt->getSequence()->getStartLoc(), ctx.getIdentifier(name), dc);
   makeIteratorVar->setImplicit();
 
   // Async iterators are not `Sendable`; they're only meant to be used from
@@ -3486,46 +3468,30 @@ static BraceStmt *desugarForEachStmt(ForEachStmt *stmt) {
     makeIteratorVar->addAttribute(nonisolated);
   }
 
-  // First, let's form a call from sequence to `.makeIterator()` and save
-  // that in a special variable which is going to be used by SILGen.
-  FuncDecl *makeIterator = isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
-                                   : ctx.getSequenceMakeIterator();
+  return makeIteratorVar;
+}
 
-  auto sequenceProto = isAsync
-                           ? ctx.getProtocol(KnownProtocolKind::AsyncSequence)
-                           : ctx.getProtocol(KnownProtocolKind::Sequence);
-  auto seqConformanceRef =
-      lookupConformance(parsedSequence->getType(), sequenceProto);
-  ConcreteDeclRef witness;
-  if (parsedSequence->getType()->isExistentialType())
-    witness = ConcreteDeclRef(makeIterator);
-  else {
-    witness = seqConformanceRef.getWitnessByName(makeIterator->getName());
-  }
-
-  auto *makeIteratorRef = new (ctx)
-      MemberRefExpr(opaqueSeqExpr, stmt->getForLoc(), witness,
-                    DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
-
-  Expr *makeIteratorCall = CallExpr::createImplicitEmpty(ctx, makeIteratorRef);
-
-  Pattern *pattern = NamedPattern::createImplicit(ctx, makeIteratorVar);
-  auto *PB = PatternBindingDecl::createImplicit(ctx, StaticSpellingKind::None,
-                                                pattern, makeIteratorCall, dc);
+static Expr *buildNextCall(ForEachStmt *stmt, VarDecl *makeIteratorVar,
+                           ProtocolDecl *sequenceProto,
+                           ProtocolConformanceRef seqConformanceRef) {
+  auto *dc = stmt->getDeclContext();
+  auto &ctx = dc->getASTContext();
+  bool isAsync = stmt->getAwaitLoc().isValid();
 
   // The result type of `.makeIterator()` is used to form a call to
   // `.next()`. `next()` is called on each iteration of the loop.
+  auto *makeIteratorVarRef =
+      new (ctx) DeclRefExpr(makeIteratorVar, DeclNameLoc(stmt->getForLoc()),
+                            /*Implicit=*/true);
+
   FuncDecl *nextFn = TypeChecker::getForEachIteratorNextFunction(
       dc, stmt->getForLoc(), isAsync);
   TinyPtrVector<Identifier> labels;
   if (nextFn && nextFn->getParameters()->size() == 1)
     labels.push_back(ctx.Id_isolation);
-  auto *makeIteratorVarRef =
-      new (ctx) DeclRefExpr(makeIteratorVar, DeclNameLoc(stmt->getForLoc()),
-                            /*Implicit=*/true);
 
   ConcreteDeclRef iteratorWitness;
-  if (parsedSequence->getType()->isExistentialType())
+  if (stmt->getSequence()->getType()->isExistentialType())
     iteratorWitness = ConcreteDeclRef(nextFn);
   else {
     auto iteratorId = isAsync ? ctx.Id_AsyncIterator : ctx.Id_Iterator;
@@ -3550,6 +3516,7 @@ static BraceStmt *desugarForEachStmt(ForEachStmt *stmt) {
   } else {
     nextArgs = ArgumentList::createImplicit(ctx, {});
   }
+
   Expr *nextCall = CallExpr::createImplicit(ctx, nextRef, nextArgs);
 
   // Wrap the 'next' call in 'unsafe', if the loop is async (in which case
@@ -3562,31 +3529,75 @@ static BraceStmt *desugarForEachStmt(ForEachStmt *stmt) {
     nextCall = UnsafeExpr::createImplicit(ctx, loc, nextCall);
   }
 
-  auto nextCallVar = new (ctx)
-      VarDecl(/*isStatic=*/false, VarDecl::Introducer::Let,
-              nextCall->getStartLoc(), ctx.getIdentifier("$element"), dc);
-  nextCallVar->setImplicit();
+  return nextCall;
+}
+
+static PatternBindingDecl *
+buildMakeIterator(ForEachStmt *stmt, ProtocolConformanceRef seqConformanceRef,
+                  VarDecl *makeIteratorVar) {
+  auto *dc = stmt->getDeclContext();
+  auto &ctx = dc->getASTContext();
+  auto *sequence = stmt->getSequence();
+  auto seqType = sequence->getType();
+  bool isAsync = stmt->getAwaitLoc().isValid();
+
+  auto *opaqueSeqExpr =
+      new (ctx) OpaqueValueExpr(sequence->getSourceRange(), seqType);
+  stmt->setOpaqueSequenceExpr(opaqueSeqExpr);
+
+  // First, let's form a call from sequence to `.makeIterator()` and save
+  // that in a special variable which is going to be used by SILGen.
+  FuncDecl *makeIterator = isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
+                                   : ctx.getSequenceMakeIterator();
+
+  ConcreteDeclRef witness;
+  if (seqType->isExistentialType())
+    witness = ConcreteDeclRef(makeIterator);
+  else {
+    witness = seqConformanceRef.getWitnessByName(makeIterator->getName());
+  }
+
+  auto *makeIteratorRef = new (ctx)
+      MemberRefExpr(opaqueSeqExpr, stmt->getForLoc(), witness,
+                    DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
+
+  Expr *makeIteratorCall = CallExpr::createImplicitEmpty(ctx, makeIteratorRef);
+
+  Pattern *pattern = NamedPattern::createImplicit(ctx, makeIteratorVar);
+  auto *PB = PatternBindingDecl::createImplicit(ctx, StaticSpellingKind::None,
+                                                pattern, makeIteratorCall, dc);
+  return PB;
+}
+
+static StmtCondition buildWhileCond(ASTContext &ctx, VarDecl *nextCallVar,
+                                    Expr *nextCall) {
 
   NamedPattern *nextCallVarPattern =
       NamedPattern::createImplicit(ctx, nextCallVar);
-  auto *nextCallVarRef = new (ctx) DeclRefExpr(
-      nextCallVar, DeclNameLoc(stmt->getForLoc()), /*Implicit=*/true);
-
-  auto elementPattern = stmt->getPattern();
-
-  SmallVector<StmtConditionElement, 1> cond;
 
   auto *somePattern =
       OptionalSomePattern::createImplicit(ctx, nextCallVarPattern);
 
   auto PBI = ConditionalPatternBindingInfo::create(ctx, SourceLoc(),
                                                    somePattern, nextCall);
+
   auto conditionElement = StmtConditionElement(PBI);
+  SmallVector<StmtConditionElement, 1> cond;
   cond.push_back(conditionElement);
 
+  return ctx.AllocateCopy(cond);
+}
+
+static SmallVector<ASTNode> buildWhileBody(ForEachStmt *stmt,
+                                           VarDecl *nextCallVar) {
+  auto *dc = stmt->getDeclContext();
+  auto &ctx = dc->getASTContext();
   SmallVector<ASTNode> whileBodyElements;
 
+  auto elementPattern = stmt->getPattern();
   auto *opaquePattern = new (ctx) OpaquePattern(elementPattern);
+  auto *nextCallVarRef = new (ctx) DeclRefExpr(
+      nextCallVar, DeclNameLoc(stmt->getForLoc()), /*Implicit=*/true);
 
   if (!elementPattern->isRefutablePattern()) {
     auto PBD = PatternBindingDecl::createImplicit(
@@ -3628,19 +3639,65 @@ static BraceStmt *desugarForEachStmt(ForEachStmt *stmt) {
   } else
     whileBodyElements.push_back(opaqueForBody);
 
-  auto *whileBody =
-      BraceStmt::create(ctx, stmt->getBody()->getLBraceLoc(), whileBodyElements,
-                        stmt->getBody()->getRBraceLoc(), /*implicit*/ true);
+  return whileBodyElements;
+}
 
-  auto *whileStmt =
-      new (ctx) WhileStmt(LabeledStmtInfo(), stmt->getForLoc(),
-                          ctx.AllocateCopy(cond), whileBody, true);
+static WhileStmt *buildWhileStmt(ForEachStmt *stmt, Expr *nextCall) {
+  auto *dc = stmt->getDeclContext();
+  auto &ctx = dc->getASTContext();
+
+  auto nextCallVar = new (ctx)
+      VarDecl(/*isStatic=*/false, VarDecl::Introducer::Let,
+              nextCall->getStartLoc(), ctx.getIdentifier("$element"), dc);
+  nextCallVar->setImplicit();
+
+  auto *whileBody = BraceStmt::create(
+      ctx, stmt->getBody()->getLBraceLoc(), buildWhileBody(stmt, nextCallVar),
+      stmt->getBody()->getRBraceLoc(), /*implicit*/ true);
+
+  auto *whileStmt = new (ctx)
+      WhileStmt(LabeledStmtInfo(), stmt->getForLoc(),
+                buildWhileCond(ctx, nextCallVar, nextCall),
+                whileBody, true);
+
+  // Set the statement as a target for any Break or Continue statements in the
+  // ForEach.
   stmt->setBreakTarget(whileStmt);
   stmt->setContinueTarget(whileStmt);
 
+  return whileStmt;
+}
+
+static BraceStmt *desugarForEachStmt(ForEachStmt *stmt) {
+  auto *sequence = stmt->getSequence();
+  auto seqType = sequence->getType();
+
+  if (isa<PackExpansionExpr>(sequence))
+    return nullptr;
+
+  if (!seqType || (stmt->getWhere() && !stmt->getWhere()->getType()))
+    return nullptr;
+
+  if (seqType->hasError() || stmt->getPattern()->getType()->hasError() ||
+      (stmt->getWhere() && stmt->getWhere()->getType()->hasError()))
+    return nullptr;
+
+  bool isAsync = stmt->getAwaitLoc().isValid();
+  auto *dc = stmt->getDeclContext();
+  auto &ctx = dc->getASTContext();
+
+  auto sequenceProto = isAsync
+                           ? ctx.getProtocol(KnownProtocolKind::AsyncSequence)
+                           : ctx.getProtocol(KnownProtocolKind::Sequence);
+  auto seqConformanceRef = lookupConformance(seqType, sequenceProto);
+
+  auto *makeIteratorVar = buildMakeIteratorVar(stmt);
+  Expr *nextCall =
+      buildNextCall(stmt, makeIteratorVar, sequenceProto, seqConformanceRef);
+
   SmallVector<ASTNode, 2> stmts;
-  stmts.push_back(PB);
-  stmts.push_back(whileStmt);
+  stmts.push_back(buildMakeIterator(stmt, seqConformanceRef, makeIteratorVar));
+  stmts.push_back(buildWhileStmt(stmt, nextCall));
 
   auto *braceStmt =
       BraceStmt::create(ctx, stmt->getStartLoc(), stmts, stmt->getEndLoc());
