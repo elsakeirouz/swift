@@ -3521,7 +3521,7 @@ static BraceStmt *desugarForEachStmt(ForEachStmt *stmt) {
   if (nextFn && nextFn->getParameters()->size() == 1)
     labels.push_back(ctx.Id_isolation);
   auto *makeIteratorVarRef =
-      new (ctx) DeclRefExpr(makeIteratorVar, DeclNameLoc(),
+      new (ctx) DeclRefExpr(makeIteratorVar, DeclNameLoc(stmt->getForLoc()),
                             /*Implicit=*/true);
 
   ConcreteDeclRef iteratorWitness;
@@ -3569,8 +3569,8 @@ static BraceStmt *desugarForEachStmt(ForEachStmt *stmt) {
 
   NamedPattern *nextCallVarPattern =
       NamedPattern::createImplicit(ctx, nextCallVar);
-  auto *nextCallVarRef =
-      new (ctx) DeclRefExpr(nextCallVar, DeclNameLoc(), /*Implicit=*/true);
+  auto *nextCallVarRef = new (ctx) DeclRefExpr(
+      nextCallVar, DeclNameLoc(stmt->getForLoc()), /*Implicit=*/true);
 
   auto elementPattern = stmt->getPattern();
 
@@ -3628,9 +3628,13 @@ static BraceStmt *desugarForEachStmt(ForEachStmt *stmt) {
   } else
     whileBodyElements.push_back(opaqueForBody);
 
-  auto *whileStmt = new (ctx)
-      WhileStmt(LabeledStmtInfo(), SourceLoc(), ctx.AllocateCopy(cond),
-                BraceStmt::createImplicit(ctx, whileBodyElements), true);
+  auto *whileBody =
+      BraceStmt::create(ctx, stmt->getBody()->getLBraceLoc(), whileBodyElements,
+                        stmt->getBody()->getRBraceLoc(), /*implicit*/ true);
+
+  auto *whileStmt =
+      new (ctx) WhileStmt(LabeledStmtInfo(), stmt->getForLoc(),
+                          ctx.AllocateCopy(cond), whileBody, true);
   stmt->setBreakTarget(whileStmt);
   stmt->setContinueTarget(whileStmt);
 

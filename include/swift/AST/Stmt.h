@@ -968,6 +968,9 @@ public:
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(WhileLoc); }
   SourceLoc getEndLoc() const { return Body->getEndLoc(); }
   SourceLoc getWhileLoc() const { return WhileLoc; }
+  SourceRange getSourceRange() const {
+    return SourceRange::combine(WhileLoc, Body->getSourceRange());
+  }
 
   Stmt *getBody() const { return Body; }
   void setBody(Stmt *s) { Body = s; }
