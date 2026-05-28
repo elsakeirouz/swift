@@ -1147,11 +1147,36 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
 
   // Assume a strict check of a temporary or formal access is initialized
   // before the check.
-  if (auto *asi = dyn_cast<AllocStackInst>(stripAccessMarkers(operand));
-      asi && address->isStrict()) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "Adding strict-marked alloc_stack as init!\n");
-    return true;
+  if (auto *asi = dyn_cast<AllocStackInst>(stripAccessMarkers(operand)); asi) {
+    if (address->isStrict()) {
+      LLVM_DEBUG(llvm::dbgs() << "Adding strict-marked alloc_stack as init!\n");
+      return true;
+    }
+    // An alloc_stack initialized by a `copy_addr [init]` writing into it.
+    if (asi->getParent() == address->getParent()) {
+
+      bool initialized = false;
+      for (auto it = std::next(asi->getIterator()); &*it != address; ++it) {
+        SILInstruction *inst = &*it;
+        if (auto *cai = dyn_cast<CopyAddrInst>(inst);
+            cai && cai->getDest() == asi && cai->isInitializationOfDest()) {
+          initialized = true;
+          break;
+        }
+        // Any kill before we find an init is invalidating.
+        if (auto *d = dyn_cast<DestroyAddrInst>(inst);
+            d && d->getOperand() == asi)
+          return false;
+        if (auto *cai = dyn_cast<CopyAddrInst>(inst);
+            cai && cai->getSrc() == asi && cai->isTakeOfSrc())
+          return false;
+      }
+      if (initialized) {
+        LLVM_DEBUG(llvm::dbgs() << "Adding alloc_stack initialized by adjacent "
+                                   "copy_addr [init] as init!\n");
+        return true;
+      }
+    }
   }
 
   // SILGen sometimes emits two stacked `mark_unresolved_non_copyable_value`s
