@@ -1687,7 +1687,12 @@ void OpaqueStorageAllocation::finalizeOpaqueStorage() {
     // a use projection.
     computeDominatedBoundaryBlocks(alloc->getParent(), pass.domInfo, boundary);
     for (SILBasicBlock *deallocBlock : boundary) {
-      if (pass.deBlocks->isDeadEnd(deallocBlock))
+      // Skip only blocks that terminate in `unreachable` directly.
+      // Blocks that merely lead to `unreachable` along all paths
+      // (DeadEndBlocks::isDeadEnd) may still have successors that participate
+      // in join points; skipping the dealloc there breaks stack-state
+      // consistency at the join.
+      if (isa<UnreachableInst>(deallocBlock->getTerminator()))
         continue;
       auto deallocBuilder = pass.getBuilder(deallocBlock->back().getIterator());
       deallocBuilder.createDeallocStack(pass.genLoc(), alloc);
@@ -1723,6 +1728,32 @@ void OpaqueStorageAllocation::sinkProjections() {
     auto *inst = dyn_cast<SingleValueInstruction>(addr);
     if (!inst)
       continue;
+    // If the materialized address is itself an alloc_stack, avoid sinking it
+    // into a loop.
+    // The deallocs were placed based on the alloc's current location.
+    // Relocating the alloc into a loop would re-execute it every iteration
+    // without matching deallocs on the back-edge, breaking stack discipline.
+    if (auto *asi = dyn_cast<AllocStackInst>(inst)) {
+      auto *lca = pass.domInfo->getLeastCommonAncestorOfUses(asi);
+      // Walk up from lca to asi's parent; if we cross a loop header, don't
+      // sink.
+      bool wouldEnterLoop = false;
+      auto *startNode = pass.domInfo->getNode(asi->getParent());
+      for (auto node = pass.domInfo->getNode(lca); node && node != startNode;
+           node = node->getIDom()) {
+        auto *block = node->getBlock();
+        for (auto *pred : block->getPredecessorBlocks()) {
+          if (pass.domInfo->dominates(block, pred)) {
+            wouldEnterLoop = true;
+            break;
+          }
+        }
+        if (wouldEnterLoop)
+          break;
+      }
+      if (wouldEnterLoop)
+        continue;
+    }
     auto sank = sinkToUses(inst, pass.domInfo);
     if (sank == SinkResult::NoUsers) {
       pass.deleter.forceDelete(inst);
