@@ -3660,12 +3660,23 @@ static PreparedArguments loadIndexValuesForKeyPathComponent(
   for (unsigned i : indices(indexes)) {
     SILValue eltAddr = pointer;
     if (indexes.size() > 1) {
-      eltAddr = SGF.B.createTupleElementAddr(loc, eltAddr, i);
+      if (pointer->getType().isAddress()) {
+        eltAddr = SGF.B.createTupleElementAddr(loc, eltAddr, i);
+      } else {
+        eltAddr = SGF.B.createTupleExtract(loc, eltAddr, i);
+      }
     }
     auto ty = SGF.F.mapTypeIntoEnvironment(indexes[i].second);
-    auto value = SGF.emitLoad(loc, eltAddr,
-                              SGF.getTypeLowering(ty),
-                              SGFContext(), IsNotTake);
+    ManagedValue value;
+    if (eltAddr->getType().isAddress()) {
+      value = SGF.emitLoad(loc, eltAddr,
+                           SGF.getTypeLowering(ty),
+                           SGFContext(), IsNotTake);
+    } else {
+      // Opaque-values mode: the index pointer is itself a guaranteed object
+      // value, so just copy it.
+      value = ManagedValue::forBorrowedRValue(eltAddr).copy(SGF, loc);
+    }
     auto substType =
       SGF.F.mapTypeIntoEnvironment(indexes[i].first)->getCanonicalType();
     indexValues.add(loc, RValue(SGF, loc, substType, value));
@@ -4397,27 +4408,43 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
 
       Scope branchScope(subSGF, loc);
 
-      SILValue lhsEltAddr = lhsAddr;
-      SILValue rhsEltAddr = rhsAddr;
-      if (indexes.size() > 1) {
-        lhsEltAddr = subSGF.B.createTupleElementAddr(loc, lhsAddr, i);
-        rhsEltAddr = subSGF.B.createTupleElementAddr(loc, rhsAddr, i);
-      }
-      auto lhsArg = subSGF.emitLoad(loc, lhsEltAddr,
-             subSGF.getTypeLowering(AbstractionPattern::getOpaque(), formalTy),
-             SGFContext(), IsNotTake);
-      auto rhsArg = subSGF.emitLoad(loc, rhsEltAddr,
-             subSGF.getTypeLowering(AbstractionPattern::getOpaque(), formalTy),
-             SGFContext(), IsNotTake);
-      
-      if (!lhsArg.getType().isAddress()) {
-        auto lhsBuf = subSGF.emitTemporaryAllocation(loc, lhsArg.getType());
-        lhsArg.forwardInto(subSGF, loc, lhsBuf);
-        lhsArg = subSGF.emitManagedBufferWithCleanup(lhsBuf);
+      ManagedValue lhsArg, rhsArg;
+      if (lhsAddr->getType().isAddress()) {
+        SILValue lhsEltAddr = lhsAddr;
+        SILValue rhsEltAddr = rhsAddr;
+        if (indexes.size() > 1) {
+          lhsEltAddr = subSGF.B.createTupleElementAddr(loc, lhsAddr, i);
+          rhsEltAddr = subSGF.B.createTupleElementAddr(loc, rhsAddr, i);
+        }
+        lhsArg = subSGF.emitLoad(loc, lhsEltAddr,
+               subSGF.getTypeLowering(AbstractionPattern::getOpaque(), formalTy),
+               SGFContext(), IsNotTake);
+        rhsArg = subSGF.emitLoad(loc, rhsEltAddr,
+               subSGF.getTypeLowering(AbstractionPattern::getOpaque(), formalTy),
+               SGFContext(), IsNotTake);
 
-        auto rhsBuf = subSGF.emitTemporaryAllocation(loc, rhsArg.getType());
-        rhsArg.forwardInto(subSGF, loc, rhsBuf);
-        rhsArg = subSGF.emitManagedBufferWithCleanup(rhsBuf);
+        if (!lhsArg.getType().isAddress()) {
+          auto lhsBuf = subSGF.emitTemporaryAllocation(loc, lhsArg.getType());
+          lhsArg.forwardInto(subSGF, loc, lhsBuf);
+          lhsArg = subSGF.emitManagedBufferWithCleanup(lhsBuf);
+
+          auto rhsBuf = subSGF.emitTemporaryAllocation(loc, rhsArg.getType());
+          rhsArg.forwardInto(subSGF, loc, rhsBuf);
+          rhsArg = subSGF.emitManagedBufferWithCleanup(rhsBuf);
+        }
+      } else {
+        // Opaque-values mode: the function arguments are guaranteed object
+        // values rather than addresses. Extract the i-th element (if needed)
+        // and copy it; the apply will borrow the owned value for the
+        // @in_guaranteed Self parameter.
+        SILValue lhsElt = lhsAddr;
+        SILValue rhsElt = rhsAddr;
+        if (indexes.size() > 1) {
+          lhsElt = subSGF.B.createTupleExtract(loc, lhsAddr, i);
+          rhsElt = subSGF.B.createTupleExtract(loc, rhsAddr, i);
+        }
+        lhsArg = ManagedValue::forBorrowedRValue(lhsElt).copy(subSGF, loc);
+        rhsArg = ManagedValue::forBorrowedRValue(rhsElt).copy(subSGF, loc);
       }
 
       auto metaty = CanMetatypeType::get(formalCanTy,
@@ -4531,7 +4558,11 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       // Extract the index value.
       SILValue indexAddr = indexPtr;
       if (indexes.size() > 1) {
-        indexAddr = subSGF.B.createTupleElementAddr(loc, indexPtr, 0);
+        if (indexPtr->getType().isAddress()) {
+          indexAddr = subSGF.B.createTupleElementAddr(loc, indexPtr, 0);
+        } else {
+          indexAddr = subSGF.B.createTupleExtract(loc, indexPtr, 0);
+        }
       }
 
       VarDecl *hashValueVar =
@@ -4553,7 +4584,9 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
           hashGenericSig, formalTy, hashable);
 
       // Read the storage.
-      ManagedValue base = ManagedValue::forBorrowedAddressRValue(indexAddr);
+      ManagedValue base = indexAddr->getType().isAddress()
+                              ? ManagedValue::forBorrowedAddressRValue(indexAddr)
+                              : ManagedValue::forBorrowedObjectRValue(indexAddr);
       hashCode =
         subSGF.emitRValueForStorageLoad(loc, base, formalTy, /*super*/ false,
                                         hashValueVar, PreparedArguments(),
