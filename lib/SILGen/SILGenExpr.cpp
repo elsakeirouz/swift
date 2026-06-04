@@ -4682,7 +4682,23 @@ static void lowerKeyPathMemberIndexTypes(
           AbstractionPattern::getOpaque(), paramTy,
           TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
               ResilienceExpansion::Minimal));
+
+      // The keypath instruction's runtime ABI passes address-only index values
+      // via addresses. Always record the address form for address-only types
+      // in the pattern, even in opaque-values mode where getLoweredType
+      // returns the object form. The actual operand may still be at object
+      // type; AddressLowering rewrites it, and the SIL verifier accepts that
+      // intermediate shape.
+      bool addressOnly =
+          paramLoweredTy.isObject() &&
+          SILType::isAddressOnly(
+              paramTy->getCanonicalType(), SGM.Types,
+              sig ? sig->getCanonicalSignature() : CanGenericSignature(),
+              TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
+                  ResilienceExpansion::Minimal));
       paramLoweredTy = paramLoweredTy.mapTypeOutOfEnvironment();
+      if (addressOnly)
+        paramLoweredTy = paramLoweredTy.getAddressType();
 
       indexPatterns.push_back(
           {paramTy->mapTypeOutOfEnvironment()->getCanonicalType(), paramLoweredTy});
