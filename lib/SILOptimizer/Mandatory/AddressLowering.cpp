@@ -416,6 +416,27 @@ static bool isStoreCopy(SILValue value) {
 
   return true;
 }
+static bool isMarkUnresolvedCopy(SILValue value) {
+  auto *copyInst = dyn_cast<CopyValueInst>(value);
+  if (!copyInst)
+    return false;
+
+  if (!copyInst->hasOneUse())
+    return false;
+
+  auto *user = value->getSingleUse()->getUser();
+  auto *inst = dyn_cast<MarkUnresolvedNonCopyableValueInst>(user);
+  if (!inst)
+    return false;
+
+  auto source = copyInst->getOperand();
+  if (source->getOwnershipKind() != OwnershipKind::Guaranteed)
+    return false;
+  if (inst->getCheckKind() !=
+      MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign)
+    return false;
+  return true;
+}
 
 void ValueStorageMap::insertValue(SILValue value, SILValue storageAddress) {
   assert(!stableStorage && "cannot grow stable storage map");
@@ -964,6 +985,8 @@ static Operand *getProjectedDefOperand(SILValue value) {
     return &cast<BeginBorrowInst>(value)->getOperandRef();
 
   case ValueKind::CopyValueInst:
+    if (isMarkUnresolvedCopy(value))
+      return &cast<CopyValueInst>(value)->getOperandRef();
     if (isStoreCopy(value))
       return &cast<CopyValueInst>(value)->getOperandRef();
 
@@ -1894,7 +1917,7 @@ SILValue AddressMaterialization::materializeDefProjection(SILValue origValue) {
     llvm_unreachable("Unexpected projection from def.");
 
   case ValueKind::CopyValueInst:
-    assert(isStoreCopy(origValue));
+    assert(isStoreCopy(origValue) || isMarkUnresolvedCopy(origValue));
     return pass.getMaterializedAddress(
         cast<CopyValueInst>(origValue)->getOperand());
 
@@ -3613,6 +3636,22 @@ protected:
 
   // Copy from an opaque source operand.
   void visitCopyValueInst(CopyValueInst *copyInst) {
+    // For the isMarkUnresolvedCopy pattern, the mark's destroy_value is the
+    // artificial cleanup of the +1 owned form. Now that the copy and mark
+    // both project onto the guaranteed source's storage, that destroy would
+    // lower to a destroy_addr of borrowed storage — illegal. Erase it.
+    if (isMarkUnresolvedCopy(copyInst)) {
+      auto *mark = cast<MarkUnresolvedNonCopyableValueInst>(
+          copyInst->getSingleUse()->getUser());
+      SmallVector<DestroyValueInst *, 4> destroys;
+      for (auto *use : mark->getConsumingUses()) {
+        if (auto *d = dyn_cast<DestroyValueInst>(use->getUser()))
+          destroys.push_back(d);
+      }
+      for (auto *d : destroys)
+        pass.deleter.forceDelete(d);
+    }
+
     SILValue srcVal = copyInst->getOperand();
     SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
 
