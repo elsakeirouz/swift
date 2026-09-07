@@ -3375,11 +3375,9 @@ private:
     bool loweredAddresses =
         SILAddressConventions::forFunctionOrRawSIL(maybeGetFunction(), C.Module)
             .useLoweredAddresses();
-
-    if (!loweredAddresses)
-      return true;
-
-    return getTypeProperties(Ty).isLoadable();
+    return computeIsLoadableOrOpaque(Ty.getRawASTType(),
+                                     getTypeProperties(Ty).isLoadable(),
+                                     loweredAddresses);
   }
 
   void appendOperandTypeName(SILType OpdTy, llvm::SmallString<16> &Name) {

@@ -474,7 +474,8 @@ EnumElementDecl *SILType::getEnumElement(int caseIndex) const {
 }
 
 bool SILType::isLoadableOrOpaque(const SILFunction &F) const {
-  return isLoadable(F) || !F.hasLoweredAddresses();
+  return computeIsLoadableOrOpaque(getRawASTType(), isLoadable(F),
+                                   F.hasLoweredAddresses());
 }
 
 bool SILType::isAddressOnly(const SILFunction &F) const {

@@ -72,6 +72,9 @@ struct delay_template_expansion {
 class SILAddressConventions {
   friend SILParameterInfo;
   friend SILResultInfo;
+  // The result filters classify results with the same predicate the public
+  // isSILIndirect() wrappers use, so they must agree.
+  friend class SILFunctionConventions;
   // forFunctionWithOverride is internal to instruction construction.
   friend class SILBuilder;
   friend class ApplyInst;
@@ -380,7 +383,8 @@ public:
     IndirectSILResultFilter(bool loweredAddresses)
         : loweredAddresses(loweredAddresses) {}
     bool operator()(SILResultInfo result) const {
-      return (loweredAddresses ? result.isFormalIndirect() : result.isPack());
+      return SILAddressConventions::isIndirectSILResult(result,
+                                                        loweredAddresses);
     }
   };
   using IndirectSILResultIter =
@@ -460,7 +464,8 @@ public:
     DirectSILResultFilter(bool loweredAddresses)
         : loweredAddresses(loweredAddresses) {}
     bool operator()(SILResultInfo result) const {
-      return (loweredAddresses ? !result.isFormalIndirect() : !result.isPack());
+      return !SILAddressConventions::isIndirectSILResult(result,
+                                                         loweredAddresses);
     }
   };
   using DirectSILResultIter =

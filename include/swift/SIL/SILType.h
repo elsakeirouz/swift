@@ -53,6 +53,31 @@ namespace swift {
 CanExistentialArchetypeType getOpenedArchetypeOf(CanType Ty);
 CanLocalArchetypeType getLocalArchetypeOf(CanType Ty);
 
+/// Packs are deliberately outside the scope of opaque values: they stay
+/// address-based all the way through, and opaque values is not intended to
+/// grow support for them.
+inline bool remainsAddressedUnderOpaqueValues(CanType type) {
+  return isa<SILPackType>(type) || isa<PackType>(type) ||
+         isa<PackExpansionType>(type);
+}
+
+/// Can a value of this type be held as an SSA value, rather than requiring
+/// memory?
+///
+/// This is the shared rule behind the three isLoadableOrOpaque entry points --
+/// SILType::isLoadableOrOpaque, TypeLowering::isLoadableOrOpaque and
+/// SILBuilder::isLoadableOrOpaque -- which differ only in how they obtain
+/// \p isLoadable and \p loweredAddresses. It lives here so the three cannot
+/// drift apart.
+inline bool computeIsLoadableOrOpaque(CanType type, bool isLoadable,
+                                      bool loweredAddresses) {
+  if (isLoadable)
+    return true;
+  // Under opaque values an address-only type is still representable as an
+  // opaque SSA value -- except a pack, which has no object representation.
+  return !loweredAddresses && !remainsAddressedUnderOpaqueValues(type);
+}
+
 /// How an existential type container is represented.
 enum class ExistentialRepresentation {
   /// The type is not existential.

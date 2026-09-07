@@ -415,9 +415,11 @@ public:
     bool argIsLoadable = false;
     if (!isAddressable) {
       argIsLoadable = argType.isLoadable(SGF.F);
+      // Whether the value can be held as an SSA value here at all.
+      //
       // This can happen if the value is resilient in the calling convention
       // but not resilient locally.
-      if (argIsLoadable) {
+      if (argType.isLoadableOrOpaque(SGF.F)) {
         if (argType.isAddress()) {
           mv = SGF.B.createLoadWithSameOwnership(loc, mv);
           argType = argType.getObjectType();

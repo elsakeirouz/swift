@@ -196,13 +196,16 @@ public:
 
   /// getLoweredType - Get the type used to represent values of the Swift type
   /// in SIL, with its value category derived from \p loweredAddresses.
-  /// 
+  ///
   /// Address-only types are by address (\c $*T) when \p loweredAddresses is
-  /// true and opaque SSA values (\c $T) otherwise.
+  /// true and opaque SSA values (\c $T) otherwise, except for packs, which
+  /// stay by address either way.
   SILType getLoweredType(bool loweredAddresses) const {
-    return LoweredType.getCategoryType((loweredAddresses && Properties.isAddressOnly())
-                                           ? SILValueCategory::Address
-                                           : SILValueCategory::Object);
+    bool isAddress = Properties.isAddressOnly() &&
+                     (loweredAddresses || remainsAddressedUnderOpaqueValues(
+                                              LoweredType.getRawASTType()));
+    return LoweredType.getCategoryType(isAddress ? SILValueCategory::Address
+                                                 : SILValueCategory::Object);
   }
 
   /// Returns true if the SIL type is an address.

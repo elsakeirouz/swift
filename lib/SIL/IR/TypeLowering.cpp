@@ -2460,8 +2460,9 @@ namespace {
     TypeLowering *handleMoveOnlyAddressOnly(CanType type,
                                             SILTypeProperties properties) {
       properties = mergeHasPack(HasPack_t(type->hasAnyPack()), properties);
-      if (!TC.Context.SILOpts.EnableSILOpaqueValues &&
-          !TypeLoweringForceOpaqueValueLowering) {
+      if ((!TC.Context.SILOpts.EnableSILOpaqueValues &&
+           !TypeLoweringForceOpaqueValueLowering) ||
+          remainsAddressedUnderOpaqueValues(type)) {
         auto silType = SILType::getPrimitiveAddressType(type);
         return new (TC)
             MoveOnlyAddressOnlyTypeLowering(silType, properties, Expansion);
@@ -2481,8 +2482,11 @@ namespace {
     TypeLowering *handleAddressOnly(CanType type,
                                     SILTypeProperties properties) {
       properties = mergeHasPack(HasPack_t(type->hasAnyPack()), properties);
-      if (!TC.Context.SILOpts.EnableSILOpaqueValues &&
-          !TypeLoweringForceOpaqueValueLowering) {
+      // Pack-related types stay addressed even in opaque values mode: the pack
+      // machinery is unconditionally address-based.
+      if ((!TC.Context.SILOpts.EnableSILOpaqueValues &&
+           !TypeLoweringForceOpaqueValueLowering) ||
+          remainsAddressedUnderOpaqueValues(type)) {
         auto silType = SILType::getPrimitiveAddressType(type);
         return new (TC) AddressOnlyTypeLowering(silType, properties,
                                                            Expansion);
@@ -3151,7 +3155,7 @@ static CanSILPackType computeLoweredPackType(TypeConverter &tc,
     loweredElts.push_back(loweredTy);
   });
 
-  bool elementIsAddress = true; // TODO
+  bool elementIsAddress = true;
   SILPackType::ExtInfo extInfo(elementIsAddress);
 
   return SILPackType::get(tc.Context, extInfo, loweredElts);
@@ -5780,7 +5784,8 @@ uint16_t FunctionType::getPointerAuthDiscriminator(
 }
 
 bool TypeLowering::isLoadableOrOpaque(const SILFunction &F) const {
-  return isLoadable() || !F.hasLoweredAddresses();
+  return computeIsLoadableOrOpaque(LoweredType.getRawASTType(), isLoadable(),
+                                   F.hasLoweredAddresses());
 }
 
 void TypeLowering::print(llvm::raw_ostream &os) const {
