@@ -167,6 +167,7 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   // conventions used here -- and read by later passes -- don't treat the
   // thunk's address arguments as opaque values.
   thunk->inheritDerivedFrom(caller);
+  thunk->setHasLoweredAddresses(true);
 
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
@@ -467,6 +468,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
     return {thunk, interfaceSubs};
 
   thunk->inheritDerivedFrom(parentThunk);
+  thunk->setHasLoweredAddresses(true);
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
   TangentBuilder builder(entry, adContext);
@@ -819,6 +821,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
     return {thunk, interfaceSubs};
 
   thunk->inheritDerivedFrom(caller);
+  thunk->setHasLoweredAddresses(true);
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
   SILBuilder builder(entry);
