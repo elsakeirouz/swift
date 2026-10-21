@@ -107,6 +107,64 @@ bb0(%0 : @guaranteed $T):
 sil_differentiability_witness [reverse] [parameters 0] [results 0] <T where T : Differentiable> @caller : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
 }
 
+// With opaque values the cast is `checked_cast_br`, and its payload is a block
+// argument of the success block. The payload has a different type than the
+// operand of the cast, so it has no incoming value to propagate its adjoint to.
+// In lowered form the cast is `checked_cast_addr_br`, which has no payload
+// argument and propagates nothing, so the pullback does the same. The failure
+// block receives the operand itself, and its adjoint is propagated as usual.
+//
+// The original keeps the object form.
+// CHECK-LABEL: sil [ossa] [opaque] @castOrIdentity : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+// CHECK:         checked_cast_br T in {{%.*}} : $T to Float, bb{{[0-9]+}}, bb{{[0-9]+}}
+//
+// The pullback takes its seed and returns its tangent indirectly.
+// CHECK-LABEL: sil private [ossa] @castOrIdentity{{.*}}TJpSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0.TangentVector, @owned {{.*}}) -> @out τ_0_0.TangentVector {
+// CHECK:       bb0([[RESULT:%.*]] : $*τ_0_0.TangentVector, [[SEED:%.*]] : $*τ_0_0.TangentVector, {{%.*}} : $_AD__castOrIdentity{{.*}}):
+//
+// The VJP turns the object-form cast into the address form.
+// CHECK-LABEL: sil [ossa] @castOrIdentity{{.*}}TJrSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> (@out τ_0_0, {{.*}}) {
+// CHECK:         checked_cast_addr_br take_on_success τ_0_0 in {{%.*}} : $*τ_0_0 to Float in {{%.*}} : $*Float, bb{{[0-9]+}}, bb{{[0-9]+}}
+//
+// After address lowering, the original casts in memory.
+// LOWERED-LABEL: sil [ossa] @castOrIdentity : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+// LOWERED:         checked_cast_addr_br take_on_success T in {{%.*}} : $*T to Float in {{%.*}} : $*Float, bb{{[0-9]+}}, bb{{[0-9]+}}
+sil [ossa] @castOrIdentity : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+bb0(%0 : @guaranteed $T):
+  debug_value %0 : $T, let, name "x", argno 1
+  %2 = copy_value %0 : $T
+  checked_cast_br T in %2 : $T to Float, bb1, bb2
+
+bb1(%4 : $Float):
+  %5 = enum $Optional<Float>, #Optional.some!enumelt, %4 : $Float
+  br bb3(%5 : $Optional<Float>)
+
+bb2(%7 : @owned $T):
+  destroy_value %7 : $T
+  %9 = enum $Optional<Float>, #Optional.none!enumelt
+  br bb3(%9 : $Optional<Float>)
+
+bb3(%11 : $Optional<Float>):
+  switch_enum %11 : $Optional<Float>, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb5
+
+bb4(%13 : $Float):
+  %14 = move_value [var_decl] %13 : $Float
+  debug_value %14 : $Float, let, name "y"
+  %16 = unconditional_checked_cast %14 : $Float to T
+  extend_lifetime %14 : $Float
+  br bb6(%16 : $T)
+
+bb5:
+  %19 = copy_value %0 : $T
+  br bb6(%19 : $T)
+
+bb6(%21 : @owned $T):
+  return %21 : $T
+}
+
+sil_differentiability_witness [reverse] [parameters 0] [results 0] <T where T : Differentiable> @castOrIdentity : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+}
+
 // The same through a `try_apply`: the callee's pullback is applied on the
 // path through the normal destination, with the seed stored to a buffer.
 // CHECK-LABEL: sil private [ossa] @catchDouble{{.*}}TJpSpSr : $@convention(thin) (Double, @owned _AD__catchDouble_bb2__Pred__src_0_wrt_0) -> Double {

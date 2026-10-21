@@ -3411,6 +3411,16 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
                << bb->getDebugID() << " argument: "
                << *bbArg);
 
+    // The payload of a conditional cast of an address-only value is not the
+    // cast's operand, so there is no incoming value to propagate its adjoint
+    // to. In lowered form the cast is `checked_cast_addr_br`, which has no
+    // payload argument and propagates nothing: do the same.
+    if (auto *ccbi = dyn_cast_or_null<CheckedCastBranchInst>(
+            bbArg->getSingleTerminator()))
+      if (ccbi->getSuccessBB() == bb &&
+          ccbi->getOperand()->getType().isAddressOnly(*bb->getParent()))
+        continue;
+
     // Get predecessor terminator operands.
     SmallVector<std::pair<SILBasicBlock *, SILValue>, 4> incomingValues;
     if (bbArg->getSingleTerminatorOperands(incomingValues)) {
