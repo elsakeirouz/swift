@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -module-name test %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-sil -module-name test %s
 
 // https://github.com/swiftlang/swift/issues/91420
 // Ensure we map archetype from protocol environment to the derivative one

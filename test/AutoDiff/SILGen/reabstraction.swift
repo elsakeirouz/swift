@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s | %FileCheck %s --check-prefixes=CHECK,ADDRESSES
+// RUN: %target-swift-frontend -enable-sil-opaque-values -Xllvm -sil-print-types -emit-silgen %s | sed 's/ \[opaque\]//' | %FileCheck %s --check-prefixes=CHECK,OPAQUE
 
 import _Differentiation
 
@@ -47,7 +48,7 @@ func makeOpaque() {
 }
 
 // CHECK-LABEL: sil{{.*}}@makeOpaque
-// CHECK:   [[STACK_ADDR:%.*]] = alloc_stack $@differentiable(reverse) @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Float, Float>
+// ADDRESSES:   [[STACK_ADDR:%.*]] = alloc_stack $@differentiable(reverse) @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Float, Float>
 // CHECK:   [[ORIG_0:%.*]] = differentiable_function_extract [original] [[BEFORE:%.*]] : $@differentiable(reverse) @callee_guaranteed (Float) -> Float
 // CHECK:   [[ORIG_1:%.*]] = copy_value [[ORIG_0]]
 // CHECK:   [[ORIG_THUNK:%.*]] = function_ref {{.*}} : $@convention(thin) (@in_guaranteed Float, @guaranteed @callee_guaranteed (Float) -> Float) -> @out Float
@@ -64,9 +65,10 @@ func makeOpaque() {
 // CHECK:   [[VJP_2:%.*]] = partial_apply [callee_guaranteed] [[VJP_THUNK]]([[VJP_1]])
 // CHECK:   [[VJP_3:%.*]] = convert_function [[VJP_2]]
 // CHECK:   [[AFTER:%.*]] = differentiable_function [parameters 0] [results 0] [[ORIG_3]] {{.*}} with_derivative {[[JVP_3]] {{.*}}, [[VJP_3]] {{.*}}}
-// CHECK:   store [[AFTER]] to [init] [[STACK_ADDR]]
+// ADDRESSES:   store [[AFTER]] to [init] [[STACK_ADDR]]
 // CHECK:   [[TRIGGER:%.*]] = function_ref @triggerReabstraction2
-// CHECK:   apply [[TRIGGER]]<@differentiable(reverse) (Float) -> Float>([[STACK_ADDR]])
+// ADDRESSES:   apply [[TRIGGER]]<@differentiable(reverse) (Float) -> Float>([[STACK_ADDR]])
+// OPAQUE:   apply [[TRIGGER]]<@differentiable(reverse) (Float) -> Float>([[AFTER]])
 
 @_silgen_name("makeSignatureDirect")
 func makeSignatureDirect() {

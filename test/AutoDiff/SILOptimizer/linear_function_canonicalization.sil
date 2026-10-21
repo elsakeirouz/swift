@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -sil-print-types -differentiation -enable-experimental-linear-map-transposition %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-opaque-values -sil-print-types -differentiation -enable-experimental-linear-map-transposition %s | sed -e 's/ \[opaque\]//' | %FileCheck %s
 
 sil_stage raw
 

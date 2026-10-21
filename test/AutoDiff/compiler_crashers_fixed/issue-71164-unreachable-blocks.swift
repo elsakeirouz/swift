@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-sil -verify %s
 
 // https://github.com/apple/swift/issues/71164
 

@@ -2,6 +2,10 @@
 // RUN: %target-swift-frontend %s -emit-module -parse-as-library -o %t
 // RUN: %llvm-bcanalyzer %t/differentiable_function.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: %target-sil-opt -enable-sil-verify-all %t/differentiable_function.swiftmodule -o - | %FileCheck %s
+// RUN: %empty-directory(%t.ov)
+// RUN: %target-swift-frontend %s -emit-module -parse-as-library -enable-sil-opaque-values -o %t.ov
+// RUN: %llvm-bcanalyzer %t.ov/differentiable_function.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
+// RUN: %target-sil-opt -enable-sil-opaque-values -enable-sil-verify-all %t.ov/differentiable_function.swiftmodule -o - | %FileCheck %s
 
 // BCANALYZER-NOT: UnknownCode
 

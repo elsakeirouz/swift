@@ -2,6 +2,7 @@
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/Library.swiftmodule -parse-as-library %t/Library.swift -enable-library-evolution
 // RUN: %target-swift-frontend -emit-silgen %t/Client.swift -I %t -module-name test | %FileCheck %t/Client.swift
+// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-silgen %t/Client.swift -I %t -module-name test | sed 's/ \[opaque\]//' | %FileCheck %t/Client.swift
 
 // UNSUPPORTED: OS=windows-msvc
 

@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -enable-builtin-module %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -enable-builtin-module -enable-sil-opaque-values %s -emit-ir | %FileCheck %s
 
 import Builtin
 import _Differentiation

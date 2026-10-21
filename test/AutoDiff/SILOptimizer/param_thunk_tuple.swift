@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -enable-sil-opaque-values %s | %FileCheck %s
 
 // Verify the result type of a subset parameters thunk matches the declaration:
 //

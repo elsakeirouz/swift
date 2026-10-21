@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -verify -enable-sil-opaque-values %s -o /dev/null
 // RUN: %target-swift-frontend -emit-sil -verify -O %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -verify -O -enable-sil-opaque-values %s -o /dev/null
 
 // rdar://186786631
 // Ensure the indirect error result of a typed-throws callee is accounted for

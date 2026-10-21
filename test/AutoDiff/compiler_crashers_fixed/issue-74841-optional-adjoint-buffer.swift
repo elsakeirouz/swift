@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-sil -verify %s
 
 // https://github.com/swiftlang/swift/issues/74841
 // We used to create invalid adjoint buffer for Optional<T>

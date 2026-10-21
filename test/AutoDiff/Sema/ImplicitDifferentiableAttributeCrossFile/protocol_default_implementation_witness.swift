@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -c -verify -primary-file %s %S/Inputs/other_file_protocol_default_implementation_witness.swift
+// RUN: %target-swift-frontend -enable-sil-opaque-values -c -verify -primary-file %s %S/Inputs/other_file_protocol_default_implementation_witness.swift
 
 // https://github.com/apple/swift/issues/55897
 // Test missing protocol requirement `@differentiable` attribute errors for

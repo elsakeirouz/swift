@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -print-ast-decl %s | %FileCheck %s --check-prefix=CHECK-AST
 // RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s --check-prefix=CHECK-SIL
+// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-silgen %s | %FileCheck %s --check-prefix=CHECK-SIL
 
 import _Differentiation
 

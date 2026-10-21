@@ -1,5 +1,6 @@
 // RUN: %target-build-swift %s
 // RUN: %target-swift-frontend -c -g -Xllvm -verify-di-holes=true %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -c -g -Xllvm -verify-di-holes=true %s
 
 // https://github.com/apple/swift/issues/57869
 // Differentiable functions with control flow yield an assertion failure

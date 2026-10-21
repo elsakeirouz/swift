@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil -verify -primary-file %s \
 // RUN:   %S/Inputs/derivatives.swift %S/Inputs/struct.swift -module-name main -o /dev/null
+// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-sil -verify -primary-file %s \
+// RUN:   %S/Inputs/derivatives.swift %S/Inputs/struct.swift -module-name main -o /dev/null
 
 import _Differentiation
 

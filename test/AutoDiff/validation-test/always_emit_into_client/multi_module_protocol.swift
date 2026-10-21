@@ -22,6 +22,7 @@
 // RUN: %target-run %t/a.out %t/%target-library-name(MultiModuleProtocol1) %t/%target-library-name(MultiModuleProtocol3)
 
 // RUN: %target-build-swift -I%t %s -emit-ir | %FileCheck %s
+// RUN: %target-build-swift -Xfrontend -enable-sil-opaque-values -I%t %s -emit-ir | %FileCheck %s
 
 import MultiModuleProtocol1
 import MultiModuleProtocol2

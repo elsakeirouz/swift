@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -enable-resilience -emit-sil -verify %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -enable-resilience -emit-sil -verify %s
 
 // https://github.com/apple/swift/issues/55085
 // SILGen verification error regarding `ImmutableAddressUseVerifier`

@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -differentiability-witness-devirtualizer %s -enable-sil-verify-all | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-opaque-values -differentiability-witness-devirtualizer %s -enable-sil-verify-all | %FileCheck %s
 
 sil_stage raw
 

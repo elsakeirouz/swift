@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil -Xllvm --sil-print-after=differentiation %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -enable-sil-opaque-values -Xllvm --sil-print-after=differentiation %s 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend -emit-sil -Xllvm --debug-only=differentiation      %s 2>&1 | %FileCheck --check-prefix=DEBUG %s
+// RUN: %target-swift-frontend -emit-sil -enable-sil-opaque-values -Xllvm --debug-only=differentiation %s -o /dev/null
 
 // Needed for '--debug-only'
 // REQUIRES: asserts

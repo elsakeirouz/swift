@@ -1,5 +1,7 @@
 // RUN: %target-swift-emit-silgen -verify -module-name main %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-opaque-values -verify -module-name main %s | sed 's/ \[opaque\]//' | %FileCheck %s
 // RUN: %target-swift-emit-sil -verify -module-name main %s
+// RUN: %target-swift-emit-sil -enable-sil-opaque-values -verify -module-name main %s
 
 // NOTE: SILParser crashes for SILGen round-trip
 // (https://github.com/apple/swift/issues/54370).

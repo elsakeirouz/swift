@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -module-name mangling -Xllvm -sil-full-demangle %s -emit-silgen | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -module-name mangling -Xllvm -sil-full-demangle %s -emit-silgen | sed 's/ \[opaque\]//' | %FileCheck %s
 
 // Note: adapted from test/SILGen/mangling.swift.
 

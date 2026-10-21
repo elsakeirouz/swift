@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -c %s -verify
+// RUN: %target-swift-frontend -enable-sil-opaque-values -c %s -verify
 
 // TF-1160: Linker error for `@usableFromInline` derivative function but
 // non-`@usableFromInline` internal original function.

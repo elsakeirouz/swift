@@ -1,5 +1,6 @@
 /// Note: -primary-file prevents non_abi->shared linkage change in `removeSerializedFlagFromAllFunctions`
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -verify -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -Xllvm -sil-print-types -emit-sil -verify -primary-file %s | %FileCheck %s
 
 import _Differentiation
 

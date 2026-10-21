@@ -1,5 +1,6 @@
 // REQUIRES: differentiable_programming
 // RUN: %target-swift-frontend -emit-ir -verify %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-ir -verify %s
 
 // This used to trigger an assertion due to LoadableByAddress incorrectly doing incorrect transforms
 // around linear map tuple users (pointer_to_address).

@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -c -enable-library-evolution %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -c -enable-library-evolution %s
 
 // https://github.com/apple/swift/issues/56263
 // AutoDiff crasher on property derivatives in library evolution mode

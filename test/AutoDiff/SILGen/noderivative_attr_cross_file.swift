@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-silgen %S/Inputs/noderivative_attr_other_file.swift %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-silgen %S/Inputs/noderivative_attr_other_file.swift %s | sed 's/ \[opaque\]//' | %FileCheck %s
 
 import _Differentiation
 

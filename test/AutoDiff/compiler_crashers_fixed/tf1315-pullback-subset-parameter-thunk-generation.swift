@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-sil %s
 
 // TF-1315: Pullback subset thunk generation crash due to unmapped parameter
 // index for `inout` differentiability parameters.

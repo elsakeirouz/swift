@@ -11,6 +11,7 @@
 // RUN: %target-run %t/a.out
 
 // RUN: %target-build-swift -I%t %s -emit-ir | %FileCheck %s
+// RUN: %target-build-swift -Xfrontend -enable-sil-opaque-values -I%t %s -emit-ir | %FileCheck %s
 
 import SingleFileModule
 import StdlibUnittest

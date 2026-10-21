@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -enable-experimental-forward-mode-differentiation -module-name=mangling -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -enable-sil-opaque-values -enable-experimental-forward-mode-differentiation -module-name=mangling -verify %s | %FileCheck %s
 
 import _Differentiation
 

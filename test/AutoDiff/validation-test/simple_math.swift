@@ -5,6 +5,7 @@
 // UN: %target-run-simple-swift(-Xfrontend -enable-experimental-forward-mode-differentiation)
 
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -Xllvm -sil-print-after=differentiation %s -emit-sil -o /dev/null -module-name null 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -Xllvm -sil-print-after=differentiation -enable-sil-opaque-values %s -emit-sil -o /dev/null -module-name null
 
 // REQUIRES: executable_test
 

@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -parse-stdlib -Xllvm -sil-print-types -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -Xllvm -sil-print-types -emit-silgen %s | %FileCheck %s --check-prefixes=CHECK,ADDRESSES
+// RUN: %target-swift-frontend -enable-sil-opaque-values -parse-stdlib -Xllvm -sil-print-types -emit-silgen %s | sed 's/ \[opaque\]//' | %FileCheck %s --check-prefixes=CHECK,OPAQUE
 
 import _Differentiation
 import Swift
@@ -71,18 +72,24 @@ func applyDerivative_f1_vjp<T: AdditiveArithmetic & Differentiable>(t0: T) -> (T
   return Builtin.applyDerivative_vjp(f_indirect_arity1, t0)
 }
 // CHECK-LABEL: sil{{.*}}@applyDerivative_f_indirect_arity1_vjp
-// CHECK: bb0([[ORIG_RESULT_OUT_PARAM:%.*]] : $*T, [[X:%.]] : $*T):
-// CHECK: [[D:%.*]] = differentiable_function_extract [vjp]
-// CHECK: [[D_RESULT_BUFFER:%.*]] = alloc_stack $(T, @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T.TangentVector, T.TangentVector>)
-// CHECK: [[D_RESULT_BUFFER_0_FOR_STORE:%.*]] = tuple_element_addr [[D_RESULT_BUFFER]] : ${{.*}}, 0
-// CHECK: [[D_RESULT:%.*]] = apply [[D]]([[D_RESULT_BUFFER_0_FOR_STORE]], [[X]])
-// CHECK: [[D_RESULT_BUFFER_1_FOR_STORE:%.*]] = tuple_element_addr [[D_RESULT_BUFFER]] : ${{.*}}, 1
-// CHECK: store [[D_RESULT]] to [init] [[D_RESULT_BUFFER_1_FOR_STORE]]
-// CHECK: [[D_RESULT_BUFFER_0_FOR_LOAD:%.*]] = tuple_element_addr [[D_RESULT_BUFFER]] : ${{.*}}, 0
-// CHECK: [[D_RESULT_BUFFER_1_FOR_LOAD:%.*]] = tuple_element_addr [[D_RESULT_BUFFER]] : ${{.*}}, 1
-// CHECK: [[PULLBACK:%.*]] = load [take] [[D_RESULT_BUFFER_1_FOR_LOAD]]
-// CHECK: copy_addr [take] [[D_RESULT_BUFFER_0_FOR_LOAD]] to [init] [[ORIG_RESULT_OUT_PARAM]]
-// CHECK: return [[PULLBACK]]
+// ADDRESSES: bb0([[ORIG_RESULT_OUT_PARAM:%.*]] : $*T, [[X:%.]] : $*T):
+// ADDRESSES: [[D:%.*]] = differentiable_function_extract [vjp]
+// ADDRESSES: [[D_RESULT_BUFFER:%.*]] = alloc_stack $(T, @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T.TangentVector, T.TangentVector>)
+// ADDRESSES: [[D_RESULT_BUFFER_0_FOR_STORE:%.*]] = tuple_element_addr [[D_RESULT_BUFFER]] : ${{.*}}, 0
+// ADDRESSES: [[D_RESULT:%.*]] = apply [[D]]([[D_RESULT_BUFFER_0_FOR_STORE]], [[X]])
+// ADDRESSES: [[D_RESULT_BUFFER_1_FOR_STORE:%.*]] = tuple_element_addr [[D_RESULT_BUFFER]] : ${{.*}}, 1
+// ADDRESSES: store [[D_RESULT]] to [init] [[D_RESULT_BUFFER_1_FOR_STORE]]
+// ADDRESSES: [[D_RESULT_BUFFER_0_FOR_LOAD:%.*]] = tuple_element_addr [[D_RESULT_BUFFER]] : ${{.*}}, 0
+// ADDRESSES: [[D_RESULT_BUFFER_1_FOR_LOAD:%.*]] = tuple_element_addr [[D_RESULT_BUFFER]] : ${{.*}}, 1
+// ADDRESSES: [[PULLBACK:%.*]] = load [take] [[D_RESULT_BUFFER_1_FOR_LOAD]]
+// ADDRESSES: copy_addr [take] [[D_RESULT_BUFFER_0_FOR_LOAD]] to [init] [[ORIG_RESULT_OUT_PARAM]]
+// ADDRESSES: return [[PULLBACK]]
+// OPAQUE: bb0([[X:%.*]] : @guaranteed $T):
+// OPAQUE: [[D:%.*]] = differentiable_function_extract [vjp]
+// OPAQUE: [[D_RESULT:%.*]] = apply [[D]]([[X]])
+// OPAQUE: ([[ORIG_RESULT:%.*]], [[PULLBACK:%.*]]) = destructure_tuple [[D_RESULT]]
+// OPAQUE: [[RESULT:%.*]] = tuple ([[ORIG_RESULT]] : $T, [[PULLBACK]] : {{.*}})
+// OPAQUE: return [[RESULT]]
 
 
 @_silgen_name("test_context_builtins_with_type")
@@ -95,7 +102,8 @@ func test_context_builtins_with_type<T>(t: T) {
 }
 
 // CHECK-LABEL: sil{{.*}}@test_context_builtins_with_type : $@convention(thin) <T> (@in_guaranteed T) -> () {
-// CHECK: bb0({{%.*}} : $*T):
+// ADDRESSES: bb0({{%.*}} : $*T):
+// OPAQUE: bb0({{%.*}} : @guaranteed $T):
 // CHECK:   [[CTX:%.*]] = builtin "autoDiffCreateLinearMapContextWithType"<T>({{%.*}} : $@thick T.Type) : $Builtin.NativeObject
 // CHECK:   [[CTX_LIFETIME:%.*]] = move_value [lexical] [var_decl] [[CTX]]
 // CHECK:   [[BORROWED_CTX:%.*]] = begin_borrow [[CTX_LIFETIME]]

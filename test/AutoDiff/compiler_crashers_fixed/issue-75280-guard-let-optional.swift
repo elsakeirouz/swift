@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
+// RUN: %target-swift-frontend -emit-sil -verify -enable-sil-opaque-values %s
 
 // https://github.com/swiftlang/swift/issues/75280
 // Ensure we accumulate adjoints properly for inject_enum_addr instructions and

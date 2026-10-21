@@ -1,4 +1,5 @@
 // RUN: %target-swift-emit-sil -verify %s | %FileCheck %s -check-prefix=CHECK-SIL
+// RUN: %target-swift-emit-sil -enable-sil-opaque-values -verify %s | %FileCheck %s -check-prefix=CHECK-SIL
 
 import _Differentiation
 

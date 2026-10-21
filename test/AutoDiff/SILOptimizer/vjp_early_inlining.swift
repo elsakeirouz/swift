@@ -7,6 +7,13 @@
 
 // RUN: cat %t.sil | %FileCheck %s --check-prefix=CHECK3
 
+// RUN: %target-swift-frontend -O -emit-sil -enable-sil-opaque-values -Xllvm -debug-only=sil-inliner -Xllvm -sil-print-pass-name %s -o %t.ov.sil 2> %t.ov.log
+
+// RUN: cat %t.ov.log | %FileCheck %s --check-prefix=CHECK1
+// RUN: cat %t.ov.log | %FileCheck %s --check-prefix=CHECK2
+
+// RUN: cat %t.ov.sil | %FileCheck %s --check-prefix=CHECK3
+
 import _Differentiation
 
 /// Only top-level pullback => VJP is assumed trivial in terms of VJP inlining decision taking

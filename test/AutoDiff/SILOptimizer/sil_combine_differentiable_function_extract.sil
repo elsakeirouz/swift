@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-opaque-values -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 // CHECK-NOT: = differentiable_function_extract
 

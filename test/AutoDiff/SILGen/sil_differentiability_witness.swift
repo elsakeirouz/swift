@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-silgen %s | %target-sil-opt -sil-verify-none | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-silgen %s | %target-sil-opt -enable-sil-opaque-values -sil-verify-none | sed 's/ \[opaque\]//' | %FileCheck %s
 
 // Test SIL differentiability witness SIL generation.
 

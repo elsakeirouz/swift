@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -O %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-sil -O %s
 
 // Fix for https://github.com/apple/swift/issues/65073:
 // We need to ensure we are not dropping the substitution map during the

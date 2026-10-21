@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-sil -O %s | %FileCheck %s
 
 // Ensure that autoDiffCreateLinearMapContext call is not LICM'ed
 import _Differentiation;

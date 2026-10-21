@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -module-name test -verify %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-sil -module-name test -verify %s
 
 // Ensure valid diagnostics is produced, not a crash
 

@@ -1,6 +1,7 @@
 // Pullback generation tests written in Swift
 
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -verify -Xllvm --sil-print-after=differentiation %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -verify -enable-sil-opaque-values -Xllvm --sil-print-after=differentiation %s 2>&1 | %FileCheck %s
 
 import _Differentiation
 

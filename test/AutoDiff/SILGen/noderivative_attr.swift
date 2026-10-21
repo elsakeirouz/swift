@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-silgen -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-silgen -verify %s | sed 's/ \[opaque\]//' | %FileCheck %s
 // REQUIRES: asserts
 
 import _Differentiation

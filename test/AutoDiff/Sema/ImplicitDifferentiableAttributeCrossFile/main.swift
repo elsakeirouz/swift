@@ -20,6 +20,7 @@
 // `swiftc -frontend main.swift -primary-file other_file.swift` should succeed, so no need for `-verify`.
 
 // RUN: %target-swift-frontend -c -verify -primary-file %s %S/Inputs/other_file.swift
+// RUN: %target-swift-frontend -enable-sil-opaque-values -c -verify -primary-file %s %S/Inputs/other_file.swift
 // RUN: %target-swift-frontend -c %s -primary-file %S/Inputs/other_file.swift
 // RUN: not %target-build-swift %s %S/Inputs/other_file.swift
 

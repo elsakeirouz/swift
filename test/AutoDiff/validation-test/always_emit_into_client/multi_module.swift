@@ -15,6 +15,7 @@
 // RUN: %target-run %t/a.out %t/%target-library-name(MultiModule1) %t/%target-library-name(MultiModule2)
 
 // RUN: %target-build-swift -I%t %s -emit-ir | %FileCheck %s
+// RUN: %target-build-swift -Xfrontend -enable-sil-opaque-values -I%t %s -emit-ir | %FileCheck %s
 
 import MultiModule1
 import MultiModule2

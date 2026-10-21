@@ -1,5 +1,6 @@
 // RUN: %target-build-swift %s
 // RUN: %target-swift-frontend -c -g -Xllvm -verify-di-holes=true %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -c -g -Xllvm -verify-di-holes=true %s
 
 // rdar://74876596
 // https://github.com/apple/swift/issues/56649

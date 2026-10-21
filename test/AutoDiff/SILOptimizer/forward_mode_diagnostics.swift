@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -enable-experimental-forward-mode-differentiation -verify %s
+// RUN: %target-swift-frontend -emit-sil -enable-experimental-forward-mode-differentiation -verify -enable-sil-opaque-values %s
 
 // Test forward-mode differentiation transform diagnostics.
 

@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -Xllvm -sil-print-types -emit-silgen %s | sed 's/ \[opaque\]//' | %FileCheck %s
 
 // Test SILGen for `@differentiable` function typed values.
 

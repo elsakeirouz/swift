@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift(-Xfrontend -solver-disable-diagnose-valid-salvage)
+// RUN: %target-run-simple-swift(-Xfrontend -solver-disable-diagnose-valid-salvage -Xfrontend -enable-sil-opaque-values)
 // REQUIRES: executable_test
 
 // FIXME: Enable test for all platforms after debugging (https://github.com/apple/swift/issues/55186).

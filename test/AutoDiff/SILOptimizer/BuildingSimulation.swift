@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -verify -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-sil -verify -O %s | %FileCheck %s
 
 import _Differentiation
 

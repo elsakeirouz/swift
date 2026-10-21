@@ -1,4 +1,5 @@
 // RUN: %target-swift-emit-sil -Xllvm -sil-print-types %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -enable-sil-opaque-values %s | %FileCheck %s
 
 import _Differentiation
 

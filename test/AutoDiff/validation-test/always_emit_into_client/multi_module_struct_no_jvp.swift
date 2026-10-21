@@ -17,6 +17,7 @@
 // RUN: %target-run %t/a.out %t/%target-library-name(MultiModuleStruct1) %t/%target-library-name(MultiModuleStruct2NoJVP)
 
 // RUN: %target-build-swift -I%t %s -emit-ir | %FileCheck %s
+// RUN: %target-build-swift -Xfrontend -enable-sil-opaque-values -I%t %s -emit-ir | %FileCheck %s
 
 // Unsupported due to expectCrash() not working
 // UNSUPPORTED: OS=wasip1

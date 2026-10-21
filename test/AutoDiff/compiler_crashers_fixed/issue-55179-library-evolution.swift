@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -c -enable-library-evolution %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -c -enable-library-evolution %s
 
 // https://github.com/swiftlang/swift/issues/55179
 // Explicitly use minimal type expansion on autodiff-related types.

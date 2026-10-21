@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-silgen %s | sed 's/ \[opaque\]//' | %FileCheck %s
 
 // Test derivative function witness table entries for `@differentiable` protocol requirements.
 

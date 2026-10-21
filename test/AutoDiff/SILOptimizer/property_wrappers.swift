@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s %S/Inputs/nontrivial_loadable_type.swift
+// RUN: %target-swift-frontend -emit-sil -verify -enable-sil-opaque-values %s %S/Inputs/nontrivial_loadable_type.swift
 // REQUIRES: asserts
 
 // Test property wrapper differentiation coverage for a variety of property

@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -verify -Xllvm -sil-print-after=differentiation -o /dev/null 2>&1 %s | %FileCheck %s -check-prefix=CHECK-SIL
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -verify -enable-sil-opaque-values -Xllvm -sil-print-after=differentiation -o /dev/null 2>&1 %s | %FileCheck %s -check-prefix=CHECK-SIL
 
 import _Differentiation
 

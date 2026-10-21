@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
+// RUN: %target-swift-frontend -emit-sil -verify -enable-sil-opaque-values %s
 
 // https://github.com/swiftlang/swift/issues/77871
 // Ensure we are correctl generating reabstraction thunks for Double <-> Optional<Double>

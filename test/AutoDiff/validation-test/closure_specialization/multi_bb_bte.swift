@@ -14,6 +14,10 @@
 // RUN: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK1
 // RUN: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK2
 // RUN: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK3
+// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-sil %s -O -module-name out -o %t/out.ov.sil
+// RUN: cat %t/out.ov.sil | %FileCheck %s --check-prefix=CHECK1
+// RUN: cat %t/out.ov.sil | %FileCheck %s --check-prefix=CHECK2
+// RUN: cat %t/out.ov.sil | %FileCheck %s --check-prefix=CHECK3
 
 import DifferentiationUnittest
 import StdlibUnittest

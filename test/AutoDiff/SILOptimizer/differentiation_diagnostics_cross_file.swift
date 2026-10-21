@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -verify -primary-file %s %S/Inputs/differentiation_diagnostics_other_file.swift -module-name main -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -verify -enable-sil-opaque-values -primary-file %s %S/Inputs/differentiation_diagnostics_other_file.swift -module-name main -o /dev/null
 
 // Test differentiation transform cross-file diagnostics.
 
