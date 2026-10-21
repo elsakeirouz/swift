@@ -942,6 +942,23 @@ struct Twople<T> {
   }
 }
 
+// Assigning a nested tuple builds the nested tuples. The values of the
+// source r-value are the leaves of the nested tuples, so they must be put back
+// together rather than put into one flat tuple.
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @assign_nested_tuple : {{.*}} {
+// CHECK:       bb0([[T:%[^,]+]] :
+// CHECK:         [[VAR_ADDR:%[^,]+]] = project_box
+// CHECK:         [[ACCESS:%[^,]+]] = begin_access [modify] [unknown] [[VAR_ADDR]]
+// CHECK:         [[INNER:%[^,]+]] = tuple ({{%[^,]+}} : $T, {{%[^,]+}} : $T)
+// CHECK:         [[OUTER:%[^,]+]] = tuple ([[INNER]] : $(T, T), {{%[^,]+}} : $T)
+// CHECK:         assign [[OUTER]] to [[ACCESS]]
+// CHECK-LABEL: } // end sil function 'assign_nested_tuple'
+@_silgen_name("assign_nested_tuple")
+func assignNestedTuple<T>(_ t: T) {
+  var z: ((T, T), T) = ((t, t), t)
+  z = ((t, t), t)
+}
+
 // CHECK-LABEL: sil{{.*}} [ossa] [opaque] @throwTypedValue : {{.*}} -> @error Err {
 // CHECK:       bb0([[E:%[^,]+]] :
 // CHECK:         [[SWIFT_WILL_THROW_TYPED:%[^,]+]] = function_ref @swift_willThrowTyped

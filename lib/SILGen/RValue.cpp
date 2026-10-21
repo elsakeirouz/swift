@@ -578,9 +578,10 @@ void RValue::assignInto(SILGenFunction &SGF, SILLocation loc,
                                        IsNotInitialization);
     } else {
       // With opaque values, a tuple can always be formed and assigned to the
-      // memory.
-      auto tupleTy = destAddr->getType().getObjectType();
-      auto tuple = SGF.B.createTuple(loc, tupleTy, srcMvValues);
+      // memory. The values have one entry per leaf of any nested tuple, so
+      // implode them to rebuild the nested tuples.
+      auto tuple =
+          implodeTupleValues<ImplodeKind::Forward>(srcMvValues, SGF, type, loc);
       SGF.B.createAssign(loc, tuple.forward(SGF), destAddr,
                          AssignOwnershipQualifier::Unknown);
     }
