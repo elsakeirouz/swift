@@ -481,3 +481,37 @@ bb0(%0 : @guaranteed $T):
 
 sil_differentiability_witness [reverse] [parameters 0] [results 0] <T where T : Differentiable> @viaTuple : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
 }
+
+// With opaque values the `enum` is an object, but its tangent,
+// `Optional<E>.TangentVector`, is address-only: the pullback has the adjoint of
+// the `enum` in a buffer. It copies the `value` field of that buffer to a
+// temporary, takes the data of the payload in place, and accumulates it into
+// the adjoint of `x`.
+// CHECK-LABEL: sil private [ossa] @wrapOptional{{.*}}TJpSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed Optional<τ_0_0>.TangentVector) -> @out τ_0_0.TangentVector {
+// CHECK:       bb0([[RESULT:%.*]] : $*τ_0_0.TangentVector, [[SEED:%.*]] : $*Optional<τ_0_0>.TangentVector):
+// CHECK:         [[PAYLOAD_ADJOINT:%.*]] = alloc_stack $Optional<τ_0_0.TangentVector>
+// CHECK:         [[SEED_COPY:%.*]] = alloc_stack $Optional<τ_0_0>.TangentVector
+// CHECK-NEXT:    copy_addr [[SEED]] to [init] [[SEED_COPY]] : $*Optional<τ_0_0>.TangentVector
+// CHECK-NEXT:    [[VALUE:%.*]] = struct_element_addr [[SEED_COPY]] : $*Optional<τ_0_0>.TangentVector, #Optional.TangentVector.value
+// CHECK-NEXT:    copy_addr [[VALUE]] to [init] [[PAYLOAD_ADJOINT]] : $*Optional<τ_0_0.TangentVector>
+// CHECK-NEXT:    [[PAYLOAD:%.*]] = unchecked_inplace_enum_data_addr [[PAYLOAD_ADJOINT]] : $*Optional<τ_0_0.TangentVector>, #Optional.some!enumelt
+// CHECK:         apply {{%.*}}<τ_0_0.TangentVector>({{%.*}}, [[PAYLOAD]], {{%.*}})
+// CHECK-NEXT:    destroy_addr [[PAYLOAD_ADJOINT]] : $*Optional<τ_0_0.TangentVector>
+// CHECK:         copy_addr [take] {{%.*}} to [init] [[RESULT]] : $*τ_0_0.TangentVector
+//
+// After address lowering, the original builds the `Optional` in memory.
+// LOWERED-LABEL: sil [ossa] @wrapOptional : $@convention(thin) <E where E : Differentiable> (@in_guaranteed E) -> @out Optional<E> {
+// LOWERED:       bb0([[ORIG_RESULT:%.*]] : $*Optional<E>, [[ORIG_X:%.*]] : $*E):
+// LOWERED:         [[ORIG_DATA:%.*]] = init_enum_data_addr [[ORIG_RESULT]] : $*Optional<E>, #Optional.some!enumelt
+// LOWERED:         copy_addr [[ORIG_X]] to [init] [[ORIG_DATA]] : $*E
+// LOWERED:         inject_enum_addr [[ORIG_RESULT]] : $*Optional<E>, #Optional.some!enumelt
+sil [ossa] @wrapOptional : $@convention(thin) <E where E : Differentiable> (@in_guaranteed E) -> @out Optional<E> {
+bb0(%0 : @guaranteed $E):
+  debug_value %0 : $E, let, name "x", argno 1
+  %2 = copy_value %0 : $E
+  %3 = enum $Optional<E>, #Optional.some!enumelt, %2 : $E
+  return %3 : $Optional<E>
+}
+
+sil_differentiability_witness [reverse] [parameters 0] [results 0] <E where E : Differentiable> @wrapOptional : $@convention(thin) <E where E : Differentiable> (@in_guaranteed E) -> @out Optional<E> {
+}

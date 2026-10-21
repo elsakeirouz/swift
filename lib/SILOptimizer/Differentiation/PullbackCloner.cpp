@@ -2134,6 +2134,31 @@ public:
       return;
     }
 
+    EnumElementDecl *someElemDecl = getASTContext().getOptionalSomeDecl();
+
+    // The tangent of an `Optional` of an address-only value is address-only: the
+    // adjoint of the `enum` is a buffer. This is the case for the object form
+    // of the instruction used with opaque values.
+    if (getTangentValueCategory(ei) == SILValueCategory::Address) {
+      SILValue adjDest = getAdjointBuffer(bb, ei);
+      VarDecl *adjOptVar = getASTContext().getOptionalTanValueDecl(
+          adjDest->getType().getASTType());
+      auto *adjOpt = builder.createStructElementAddr(loc, adjDest, adjOptVar);
+      // Like in `visitInjectEnumAddrInst`, copy `Optional<T.TangentVector>` to
+      // a new alloca to take its data in place.
+      AllocStackInst *adjOptCopy =
+          createFunctionLocalAllocation(adjOpt->getType(), loc);
+      builder.createCopyAddr(loc, adjOpt, adjOptCopy, IsNotTake,
+                             IsInitialization);
+      auto *adjData =
+          builder.createUncheckedInPlaceEnumDataAddr(loc, adjOptCopy,
+                                                     someElemDecl);
+      addToAdjointBuffer(bb, ei->getOperand(), adjData, loc);
+      builder.emitDestroyAddr(loc, adjOptCopy);
+      destroyedLocalAllocations.insert(adjOptCopy);
+      return;
+    }
+
     auto adjOpt = getAdjointValue(bb, ei);
     auto adjStruct = materializeAdjointDirect(adjOpt, loc);
 
@@ -2141,7 +2166,6 @@ public:
       getASTContext().getOptionalTanValueDecl(adjStruct->getType().getASTType());
     auto *adjVal = builder.createStructExtract(loc, adjStruct, adjOptVar);
 
-    EnumElementDecl *someElemDecl = getASTContext().getOptionalSomeDecl();
     auto *adjData = builder.createUncheckedEnumData(loc, adjVal, someElemDecl);
 
     addAdjointValue(bb, ei->getOperand(), makeConcreteAdjointValue(adjData), loc);
