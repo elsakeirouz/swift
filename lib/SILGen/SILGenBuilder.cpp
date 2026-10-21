@@ -706,6 +706,11 @@ SILGenBuilder::createMarkUninitialized(ValueDecl *decl, ManagedValue operand,
 
 ManagedValue SILGenBuilder::createEnum(SILLocation loc, ManagedValue payload,
                                        EnumElementDecl *decl, SILType type) {
+  // With opaque values, an address-only `enum` is an owned value: it is lowered
+  // to a buffer, so its payload cannot be a borrowed value that is forwarded
+  // into it. See ValueOwnershipKindClassifier::visitEnumInst.
+  if (type.isAddressOnly(SGF.F))
+    payload = payload.ensurePlusOne(SGF, loc);
   SILValue result = createEnum(loc, payload.forward(SGF), decl, type);
   if (result->getOwnershipKind() == OwnershipKind::None)
     return ManagedValue::forObjectRValueWithoutOwnership(result);
