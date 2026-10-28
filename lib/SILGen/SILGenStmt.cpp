@@ -852,15 +852,18 @@ bool SILGenFunction::emitBorrowOrMutateAccessorResult(
   }
 
   SILValue result = resultMV->getValue();
-  SILType selfType = F.getSelfArgument()->getType();
 
   if (F.getConventions().hasGuaranteedResult()) {
     // If we are returning the result of borrow accessor, strip the
     // unnecessary copy_value + mark_unresolved_non_copyable_value
     // instructions.
-    if (selfType.isMoveOnly()) {
-      result = lookThroughMoveOnlyCheckerPattern(result);
-    }
+    //
+    // This isn't only needed when `self` is move-only. Under opaque values, the
+    // result of a borrow accessor called on a copyable `self` gets wrapped in
+    // the same way when its type is a generic parameter that may be
+    // noncopyable. Returning the wrapper would use the borrow after its scope
+    // has ended.
+    result = lookThroughMoveOnlyCheckerPattern(result);
     // If the SIL convention is @guaranteed and the generated result is an
     // address, emit a load_borrow.
     if (result->getType().isAddress()) {
