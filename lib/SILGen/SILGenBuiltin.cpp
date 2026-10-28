@@ -2354,11 +2354,38 @@ static ManagedValue emitBuiltinEmplace(SILGenFunction &SGF,
     auto normalBB = SGF.createBasicBlock();
     auto errorBB = SGF.createBasicBlock();
 
-    SGF.B.createTryApply(loc, args[0].getValue(), {},
-                         {SGF.IndirectErrorResult, bufferPtr}, normalBB, errorBB);
+    // The closure's error is returned indirectly only if it is address-only and
+    // addresses are lowered. Otherwise (under opaque values, or for a loadable
+    // error type) it is returned directly, and the error block receives it as
+    // an argument.
+    auto fnConv = SGF.silConv.getFunctionConventions(fnType);
+    bool hasIndirectError = fnConv.hasIndirectSILErrorResults();
+
+    if (hasIndirectError) {
+      // Have the closure write its error straight into our own indirect error
+      // result. This assumes that the error is rethrown out of the enclosing
+      // function as-is, i.e. that the closure throws the same error type as the
+      // function and that the call isn't inside of a `do`/`catch`.
+      assert(SGF.IndirectErrorResult &&
+             "Builtin.emplace with an indirect error must be emitted into a "
+             "function that throws the same error indirectly");
+      SGF.B.createTryApply(loc, args[0].getValue(), {},
+                           {SGF.IndirectErrorResult, bufferPtr}, normalBB,
+                           errorBB);
+    } else {
+      SGF.B.createTryApply(loc, args[0].getValue(), {}, {bufferPtr}, normalBB,
+                           errorBB);
+    }
 
     // Error branch
     {
+      SILValue directError;
+      if (!hasIndirectError) {
+        directError = errorBB->createPhiArgument(
+            fnConv.getSILErrorType(SGF.getTypeExpansionContext()),
+            OwnershipKind::Owned);
+      }
+
       SGF.B.emitBlock(errorBB);
 
       // When the closure throws an error, it needs to clean up the buffer. This
@@ -2368,9 +2395,16 @@ static ManagedValue emitBuiltinEmplace(SILGenFunction &SGF,
       // here.
       SGF.B.createEndLifetime(loc, buffer);
 
-      SGF.Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
+      if (hasIndirectError) {
+        SGF.Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
 
-      SGF.B.createThrowAddr(loc);
+        SGF.B.createThrowAddr(loc);
+      } else {
+        // Propagate the error to the current throw destination, like any other
+        // `try_apply` does.
+        FullExpr errorScope(SGF.Cleanups, CleanupLocation(loc));
+        SGF.emitThrow(loc, SGF.emitManagedRValueWithCleanup(directError));
+      }
     }
 
     SGF.B.emitBlock(normalBB);
