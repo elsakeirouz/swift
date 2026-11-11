@@ -842,6 +842,7 @@ public:
     OpenExistentialBox,
     ProjectBox,
     MarkDependenceNonEscaping,
+    ValueToAddress,
   };
 
 private:
@@ -870,6 +871,8 @@ public:
       return Kind::OpenExistentialBox;
     case SILInstructionKind::ProjectBoxInst:
       return Kind::ProjectBox;
+    case SILInstructionKind::ValueToAddressInst:
+      return Kind::ValueToAddress;
     case SILInstructionKind::MarkDependenceInst: {
       auto *mdi = cast<MarkDependenceInst>(use->getUser());
       return mdi->isNonEscaping() && mdi->getType().isAddress()
@@ -894,6 +897,8 @@ public:
       return Kind::OpenExistentialBox;
     case ValueKind::ProjectBoxInst:
       return Kind::ProjectBox;
+    case ValueKind::ValueToAddressInst:
+      return Kind::ValueToAddress;
     case ValueKind::MarkDependenceInst: {
       auto *mdi = cast<MarkDependenceInst>(value->getDefiningInstruction());
       return mdi->isNonEscaping() && mdi->getType().isAddress()
@@ -953,7 +958,8 @@ struct InteriorPointerOperand {
     case InteriorPointerOperandKind::RefElementAddr:
     case InteriorPointerOperandKind::RefTailAddr:
     case InteriorPointerOperandKind::OpenExistentialBox:
-    case InteriorPointerOperandKind::ProjectBox: {
+    case InteriorPointerOperandKind::ProjectBox:
+    case InteriorPointerOperandKind::ValueToAddress: {
       // Ok, we have a valid instruction. Return the relevant operand.
       auto *op =
           &cast<SingleValueInstruction>(resultValue)->getAllOperands()[0];
@@ -1003,6 +1009,8 @@ struct InteriorPointerOperand {
       return cast<OpenExistentialBoxInst>(operand->getUser());
     case InteriorPointerOperandKind::ProjectBox:
       return cast<ProjectBoxInst>(operand->getUser());
+    case InteriorPointerOperandKind::ValueToAddress:
+      return cast<ValueToAddressInst>(operand->getUser());
     case InteriorPointerOperandKind::MarkDependenceNonEscaping:
       return cast<MarkDependenceInst>(operand->getUser());
     }

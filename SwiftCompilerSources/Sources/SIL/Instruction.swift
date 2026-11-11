@@ -1870,6 +1870,9 @@ final public class CopyableToMoveOnlyWrapperAddrInst
 final public class MoveOnlyWrapperToCopyableAddrInst
   : SingleValueInstruction, UnaryInstruction {}
 
+final public class ValueToAddressInst
+  : SingleValueInstruction, UnaryInstruction {}
+
 final public class UncheckedOwnershipInst: SingleValueInstruction, UnaryInstruction {}
 
 final public class ObjectInst : SingleValueInstruction {

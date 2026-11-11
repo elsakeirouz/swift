@@ -5805,6 +5805,13 @@ public:
                     "bridge_object_to_word must produce a Word");
   }
 
+  void checkValueToAddressInst(ValueToAddressInst *VAI) {
+    require(!F.hasLoweredAddresses(),
+            "value_to_address is only valid in opaque values");
+    require(VAI->getType().isAddressOnly(F),
+            "value_to_address must produce an address-only value");
+  }
+
   void checkConvertFunctionInst(ConvertFunctionInst *ICI) {
     auto opTI = requireObjectType(SILFunctionType, ICI->getOperand(),
                                   "convert_function operand");

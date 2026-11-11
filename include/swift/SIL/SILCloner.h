@@ -2509,6 +2509,14 @@ void SILCloner<ImplClass>::visitCopyableToMoveOnlyWrapperAddrInst(
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitValueToAddressInst(ValueToAddressInst *inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(inst->getDebugScope()));
+  recordClonedInstruction(
+      inst, getBuilder().createValueToAddress(getOpLocation(inst->getLoc()),
+                                              getOpValue(inst->getOperand())));
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitCopyableToMoveOnlyWrapperValueInst(
     CopyableToMoveOnlyWrapperValueInst *inst) {
   getBuilder().setCurrentDebugScope(getOpScope(inst->getDebugScope()));
