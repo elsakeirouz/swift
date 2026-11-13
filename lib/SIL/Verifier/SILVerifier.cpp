@@ -5810,6 +5810,36 @@ public:
             "value_to_address is only valid in opaque values");
     require(VAI->getType().isAddressOnly(F),
             "value_to_address must produce an address-only value");
+
+    // The operand must be a variable: an indirect function argument, a
+    // [var_decl] move_value or begin_borrow, or a value whose address the
+    // callee provides (a borrow accessor's result or a coroutine's guaranteed
+    // yield). The operand may be behind a nested borrow. A temporary, such as a
+    // copy_value, has no stable address.
+    auto isVariable = [](SILValue value) {
+      if (auto *arg = dyn_cast<SILFunctionArgument>(value))
+        return arg->getArgumentConvention().isIndirectConvention();
+      if (auto *borrow = dyn_cast<BeginBorrowInst>(value))
+        return bool(borrow->isFromVarDecl());
+      if (auto *move = dyn_cast<MoveValueInst>(value))
+        return bool(move->isFromVarDecl());
+      if (auto *apply = dyn_cast<ApplyInst>(value))
+        return apply->hasGuaranteedAddressResult();
+      if (isa_and_nonnull<BeginApplyInst>(value->getDefiningInstruction()))
+        return value->getOwnershipKind() == OwnershipKind::Guaranteed;
+      return false;
+    };
+    SILValue root = VAI->getOperand();
+    while (!isVariable(root)) {
+      auto *borrow = dyn_cast<BeginBorrowInst>(root);
+      if (!borrow)
+        break;
+      root = borrow->getOperand();
+    }
+    require(isVariable(root),
+            "value_to_address operand must be an indirect argument, a "
+            "[var_decl] move_value or begin_borrow, a borrow accessor result, "
+            "or a guaranteed coroutine yield");
   }
 
   void checkConvertFunctionInst(ConvertFunctionInst *ICI) {

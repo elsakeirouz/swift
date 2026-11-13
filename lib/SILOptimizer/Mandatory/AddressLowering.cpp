@@ -4489,24 +4489,30 @@ protected:
     pass.deleter.forceDelete(sbi);
   }
 
-  // Whether the storage of \p value is an alloc_stack or an indirect argument,
-  // or a projection of one. AddressLowering assigns that storage and keeps it
-  // for as long as the value's.
-  bool hasAllocationOrArgumentStorage(SILValue value) {
+  // Whether the storage of \p value is an alloc_stack, an indirect argument, or
+  // an address that a callee returned or yielded (a borrow accessor's result or
+  // a coroutine's guaranteed yield, see doesNotNeedStackAllocation), or a
+  // projection of one. AddressLowering assigns that storage and keeps it for as
+  // long as the value's.
+  bool hasStableStorage(SILValue value) {
     while (Operand *reusedOper = getReusedStorageOperand(value))
       value = reusedOper->get();
     SILValue rootAddr =
         pass.valueStorageMap.getBaseStorage(value).storageAddress;
-    return rootAddr && (isa<AllocStackInst>(rootAddr) ||
-                        isa<SILFunctionArgument>(rootAddr));
+    return rootAddr &&
+           (isa<AllocStackInst>(rootAddr) ||
+            isa<SILFunctionArgument>(rootAddr) || isa<ApplyInst>(rootAddr) ||
+            isa_and_nonnull<BeginApplyInst>(
+                rootAddr->getDefiningInstruction()));
   }
 
   // The address of an opaque value is the address of its storage.
   void visitValueToAddressInst(ValueToAddressInst *vta) {
     SILValue addr = addrMat.materializeAddress(use->get());
-    assert(hasAllocationOrArgumentStorage(use->get()) &&
-           "value_to_address operand's storage must be an alloc_stack or an "
-           "indirect argument, or a projection of one");
+    assert(hasStableStorage(use->get()) &&
+           "value_to_address operand's storage must be an alloc_stack, an "
+           "indirect argument, or an address returned or yielded by a callee, "
+           "or a projection of one");
     vta->replaceAllUsesWith(addr);
     pass.deleter.forceDelete(vta);
   }
