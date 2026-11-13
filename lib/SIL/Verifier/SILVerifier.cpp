@@ -5823,8 +5823,13 @@ public:
         return bool(borrow->isFromVarDecl());
       if (auto *move = dyn_cast<MoveValueInst>(value))
         return bool(move->isFromVarDecl());
-      if (auto *apply = dyn_cast<ApplyInst>(value))
-        return apply->hasGuaranteedAddressResult();
+      if (auto *apply = dyn_cast<ApplyInst>(value)) {
+        // Before AddressLowering, the conventions don't report a
+        // @guaranteed_address result as an address, so look at the callee type.
+        auto results = apply->getSubstCalleeType()->getResults();
+        return results.size() == 1 && results[0].getConvention() ==
+                                          ResultConvention::GuaranteedAddress;
+      }
       if (isa_and_nonnull<BeginApplyInst>(value->getDefiningInstruction()))
         return value->getOwnershipKind() == OwnershipKind::Guaranteed;
       return false;
