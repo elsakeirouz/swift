@@ -54,7 +54,6 @@
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <array>
-#include <cassert>
 
 namespace llvm {
 namespace ilist_detail {
