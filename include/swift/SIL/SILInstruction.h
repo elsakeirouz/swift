@@ -54,6 +54,7 @@
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <array>
+#include <cassert>
 
 namespace llvm {
 namespace ilist_detail {
@@ -8246,6 +8247,21 @@ class StructElementAddrInst
 public:
   StructDecl *getStructDecl() const {
     return cast<StructDecl>(getParentDecl());
+  }
+};
+
+// Derive the address of an addressable object.
+class ValueToAddressInst
+    : public UnaryInstructionBase<SILInstructionKind::ValueToAddressInst,
+                                  SingleValueInstruction> {
+  friend SILBuilder;
+
+  ValueToAddressInst(SILDebugLocation DebugLoc, SILValue Operand)
+      : UnaryInstructionBase(DebugLoc, Operand,
+                             Operand->getType().getAddressType()) {
+    assert(Operand->getType().isObject() &&
+           Operand->getType().isAddressOnly(*Operand->getFunction()) &&
+           "Expected an address-only object operand");
   }
 };
 

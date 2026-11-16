@@ -353,6 +353,9 @@ OPERAND_OWNERSHIP(ForwardingConsume, Thunk)
 OPERAND_OWNERSHIP(InteriorPointer, RefElementAddr)
 OPERAND_OWNERSHIP(InteriorPointer, RefTailAddr)
 OPERAND_OWNERSHIP(InteriorPointer, OpenExistentialBox)
+// The result is the address of the operand's storage. Accept any ownership: the
+// uses of the address are uses of the operand.
+OPERAND_OWNERSHIP(AnyInteriorPointer, ValueToAddress)
 OPERAND_OWNERSHIP(InstantaneousUse, HopToExecutor)
 OPERAND_OWNERSHIP(PointerEscape, ExtractExecutor)
 
