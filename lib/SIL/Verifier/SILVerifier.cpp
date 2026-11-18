@@ -5857,11 +5857,6 @@ public:
     require(VAI->getType().isAddressOnly(F),
             "value_to_address must produce an address-only value");
 
-    // The operand must be a variable: an indirect function argument, a
-    // [var_decl] move_value or begin_borrow, or a value whose address the
-    // callee provides (a borrow accessor's result or a coroutine's guaranteed
-    // yield). The operand may be behind a nested borrow. A temporary has no
-    // stable address.
     auto isVariable = [](SILValue value) {
       if (auto *arg = dyn_cast<SILFunctionArgument>(value))
         return arg->getArgumentConvention().isIndirectConvention();
@@ -5881,6 +5876,8 @@ public:
       return false;
     };
     SILValue root = VAI->getOperand();
+    // The operand may be behind a nested borrow. A temporary has no
+    // stable address.
     while (!isVariable(root)) {
       auto *borrow = dyn_cast<BeginBorrowInst>(root);
       if (!borrow)

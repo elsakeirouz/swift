@@ -4489,11 +4489,9 @@ protected:
     pass.deleter.forceDelete(sbi);
   }
 
-  // Whether the storage of \p value is an alloc_stack, an indirect argument, or
-  // an address that a callee returned or yielded (a borrow accessor's result or
-  // a coroutine's guaranteed yield, see doesNotNeedStackAllocation), or a
-  // projection of one. AddressLowering assigns that storage and keeps it for as
-  // long as the value's.
+  // Whether the storage of \p value is an alloc_stack, an indirect argument,
+  // an address that a callee returned or yielded, or a projection of one.
+  // Assign that storage and keep it for as long as the value's.
   bool hasStableStorage(SILValue value) {
     while (Operand *reusedOper = getReusedStorageOperand(value))
       value = reusedOper->get();
